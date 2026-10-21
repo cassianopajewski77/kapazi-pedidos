@@ -5,7 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Hoja de Pedido Kapazi</title>
 <link rel="icon" href="favicon.png">
+<script src="config.js"></script>
 <script src="logo.js"></script>
+<script src="traducao.js"></script>
 <style>
 :root{--navy:#041243;--coral:#F16A64;--line:#d9dbe2;--muted:#6b7080;--bg:#f5f6f8;--card:#fff;--ok:#1e6b38;--sel:#eef3fb;--warn:#fff8dc}
 *{box-sizing:border-box}
@@ -125,7 +127,8 @@ dialog::backdrop{background:rgba(4,18,67,.45)}
 "use strict";
 /* Hoja de Pedido online (pública, sem login). O cliente escolhe os produtos e baixa um PDF que o
    "Importar pedido do cliente" do gerador lê direto: marca KZ-PED, cabeçalho CÓDIGO / CANTIDAD e só
-   as linhas com quantidade. Catálogo: cópia em catalogo.json (ferramentas/gerar_catalogo.js), sem preços. */
+   as linhas com quantidade. Catálogo: função catalogo_pedido() do Supabase do gerador (sem preços); se ela
+   não responder, vale a cópia em catalogo.json (ferramentas/gerar_catalogo.js), que também traz fotos extras. */
 const URL_JSPDF = "https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js";
 const URL_AUTOTABLE = "https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js";
 const CONTATO = "cassiano.pajewski@kapazi.com.br";
@@ -165,12 +168,29 @@ if(window.LOGO_KAPAZI) document.getElementById("logo").src = window.LOGO_KAPAZI;
 
 /* ---------- catálogo ---------- */
 function aviso(msg){ const a = document.getElementById("aviso"); a.innerHTML = msg; a.style.display = msg ? "" : "none"; }
-async function carregarCatalogo(){
+async function carregarCopia(){
   const r = await fetch("catalogo.json", {cache: "no-cache"});
   if(!r.ok) throw new Error("HTTP " + r.status);
   return (await r.json()).produtos;
 }
-const norm = s => (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+async function carregarBanco(){
+  const c = window.PEDIDOS_CFG;
+  const r = await fetch(c.url + "/rest/v1/rpc/catalogo_pedido", {method: "POST", headers: {apikey: c.key, "Content-Type": "application/json"}, body: "{}"});
+  if(!r.ok) throw new Error("HTTP " + r.status);
+  const vistos = new Set();
+  return (await r.json()).filter(p => p && p.cod && !vistos.has(p.cod) && vistos.add(p.cod)).map(p => {
+    const s = sugerirUnidade({um: p.um, desc: p.descricao || ""}), desc = (p.descricao_es || traduzir(p.descricao || "")).trim() || p.cod;
+    return {cod: p.cod, desc, pt: p.descricao && p.descricao !== desc ? p.descricao : "", unidade: s.unidade, base: s.baseFator || "", foto: p.foto_url || ""};
+  });
+}
+// banco do gerador (sempre atualizado); a cópia completa as fotos e serve de reserva se o banco não responder
+async function carregarCatalogo(){
+  const [banco, copia] = await Promise.allSettled([carregarBanco(), carregarCopia()]);
+  const fotos = new Map((copia.value || []).map(p => [p.cod, p.foto]));
+  if(banco.status === "fulfilled" && banco.value.length) return banco.value.map(p => p.foto ? p : {...p, foto: fotos.get(p.cod) || ""});
+  if(copia.status === "fulfilled") return copia.value;
+  throw banco.reason;
+}
 function prepararCatalogo(linhas){
   CAT = linhas.map(p => ({...p, k: chave(p.cod), busca: norm(p.cod + " " + p.desc + " " + (p.pt || "")).replace(/,/g, "."),
     cat: (p.desc.match(/^[^\s\d(]+(\s+(DE|DEL)\s+[^\s\d(]+)?/) || [""])[0]}));

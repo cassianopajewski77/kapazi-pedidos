@@ -1,6 +1,6 @@
 // Teste do site de pedidos (site/index.html), sem internet: usa a cópia do catálogo (site/catalogo.json)
 // e o PDF baixado é lido pelo MESMO código de importação do gerador de proforma (lerPdf + processarPedido).
-// Uso: GERADOR="/caminho/Gerador de Proforma.html" LIBS=/caminho/libs node testes/teste_pedido.js
+// Uso: GERADOR="/caminho/Gerador de Proforma.html" LIBS=/caminho/libs [BANCO=/caminho/rpc.json] node testes/teste_pedido.js
 //   GERADOR: o HTML do gerador (do PC ou o web/gerador.html do export-link)
 //   LIBS: pasta com jspdf/dist/jspdf.umd.min.js, jspdf-autotable/dist/jspdf.plugin.autotable.min.js
 //         e pdfjs-dist/legacy/build/pdf.js (versões do pedido.html e do gerador)
@@ -41,6 +41,9 @@ function importadorDoGerador(){
   const nav = await chromium.launch();
   const ctx = await nav.newContext({acceptDownloads: true});
   await ctx.route(/^https?:\/\/(?!localhost)/, r => r.abort());
+  // BANCO=<json do catalogo_pedido()>: simula o Supabase do gerador; sem ele o site usa a cópia (catalogo.json)
+  let chamadasBanco = 0;
+  if(process.env.BANCO) await ctx.route(/supabase\.co\/rest\/v1\/rpc\/catalogo_pedido/, r => { chamadasBanco++; r.fulfill({contentType: "application/json", body: fs.readFileSync(process.env.BANCO)}); });
   await ctx.route(/cdn\.jsdelivr\.net\/npm\/jspdf@/, r => r.fulfill({contentType: "application/javascript", body: fs.readFileSync(path.join(LIBS, "jspdf/dist/jspdf.umd.min.js"))}));
   await ctx.route(/cdn\.jsdelivr\.net\/npm\/jspdf-autotable@/, r => r.fulfill({contentType: "application/javascript", body: fs.readFileSync(path.join(LIBS, "jspdf-autotable/dist/jspdf.plugin.autotable.min.js"))}));
   const pg = await ctx.newPage();
@@ -49,7 +52,8 @@ function importadorDoGerador(){
 
   await pg.goto(base + "/?cliente=007700");
   await pg.waitForSelector(".prod");
-  confere(await pg.$$eval(".prod", l => l.length) > 0, `catálogo copiado carregado (${catalogo.length} produtos)`);
+  confere(await pg.$$eval(".prod", l => l.length) > 0 && await pg.evaluate(() => CAT.length) === catalogo.length, `catálogo carregado (${catalogo.length} produtos)` + (process.env.BANCO ? "" : " pela cópia, sem o banco"));
+  if(process.env.BANCO) confere(chamadasBanco === 1 && await pg.evaluate(() => CAT.filter(p => p.foto).length) === catalogo.filter(p => p.foto).length, "lido do banco do gerador, com as fotos extras da cópia");
   confere(await pg.$$eval(".prod", l => l.length) === 40, "lista mostra os primeiros 40 produtos");
   confere(await pg.inputValue("#d_codCliente") === "007700", "?cliente= preenche o código de cliente");
 

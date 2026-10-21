@@ -2,13 +2,13 @@
 // Uso: node ferramentas/gerar_catalogo.js <produtos.json> [pasta com fotos.js e fotos_catalogo.js]
 //   produtos.json: [{cod, descricao, descricao_es, um, origem, foto_url}, ...] – os produtos ativos do gerador
 //   (tabela de preço vigente + produtos cadastrados). Preço NÃO entra na cópia.
-// A descrição em espanhol e a unidade usam o mesmo código do gerador (ferramentas/traducao_gerador.js).
+// A descrição em espanhol e a unidade usam o mesmo código do gerador (site/traducao.js).
 const fs = require("fs"), path = require("path");
 const raiz = path.join(__dirname, ".."), SITE = path.join(raiz, "site");
 const [entrada, pastaFotos] = process.argv.slice(2);
 if(!entrada){ console.error("uso: node ferramentas/gerar_catalogo.js <produtos.json> [pasta das fotos]"); process.exit(1); }
 global.window = {};
-const T = new Function(fs.readFileSync(path.join(__dirname, "traducao_gerador.js"), "utf8") + "; return {traduzir, sugerirUnidade};")();
+const T = new Function(fs.readFileSync(path.join(SITE, "traducao.js"), "utf8") + "; return {traduzir, sugerirUnidade};")();
 const lista = JSON.parse(fs.readFileSync(entrada, "utf8"));
 let F = {}, C = {img: [], map: {}};
 if(pastaFotos){
