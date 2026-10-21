@@ -1,0 +1,9 @@
+/
+  Cache-Control: no-cache
+/index.html
+  Cache-Control: no-cache
+/catalogo.json
+  Cache-Control: no-cache
+/*
+  X-Frame-Options: DENY
+  Referrer-Policy: same-origin
