@@ -3,6 +3,9 @@
   "name": "kapazi-pedidos",
   "main": "worker/index.js",
   "compatibility_date": "2026-10-01",
+  // endereço kapazi-pedidos.<conta>.workers.dev ligado (é o link que vai para os clientes)
+  "workers_dev": true,
+  "preview_urls": false,
   "assets": {
     "directory": "./site",
     "binding": "ASSETS"
