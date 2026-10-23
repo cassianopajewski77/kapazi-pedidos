@@ -121,6 +121,11 @@ function importadorDoGerador(){
   confere(await pg.$$eval("#pedTb tr", l => l.length) === 1 && (await pg.textContent("#pedTb")).includes(num), "lista Mis pedidos mostra o pedido salvo");
   await pg.click('#pedTb button[data-a="abrir"]');
   confere(await pg.evaluate(() => JSON.stringify(itens)) === antes && await pg.evaluate(() => numero) === num, "abrir pela lista devolve itens e número");
+  await pg.evaluate(() => dlgPed.open && dlgPed.close());
+  await pg.click("#btnLimpar");
+  confere(await pg.evaluate(() => !Object.keys(itens).length && !numero) && await pg.inputValue("#d_empresa") === "" && /^Ning/.test(await pg.textContent("#resumen")) && (await pg.textContent("#btnLimpar")) === "Limpiar pedido", "Limpiar pedido esvazia produtos, número e Sus datos");
+  await pg.click("#btnPedidos"); confere(await pg.$$eval("#pedTb tr", l => l.length) === 1, "Limpiar pedido não apaga os pedidos salvos"); await pg.evaluate(() => dlgPed.close());
+  await pg.click("#usarDatos");
   await pg.evaluate(() => { itens = {}; numero = ""; LS.set("kz_pedidos_v1", []); resumo(); });
   await pg.click("#btnPedidos");
   await pg.setInputFiles("#pedArquivo", arq);

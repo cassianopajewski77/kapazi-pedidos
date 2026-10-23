@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Hoja de Pedido Kapazi</title>
 <link rel="icon" href="favicon.png">
-<script src="config.js?v=20261023e"></script>
-<script src="logo.js?v=20261023e"></script>
-<script src="traducao.js?v=20261023e"></script>
-<script src="idiomas.js?v=20261023e"></script>
+<script src="config.js?v=20261023f"></script>
+<script src="logo.js?v=20261023f"></script>
+<script src="traducao.js?v=20261023f"></script>
+<script src="idiomas.js?v=20261023f"></script>
 <style>
 :root{--navy:#041243;--coral:#F16A64;--line:#d9dbe2;--muted:#6b7080;--bg:#f5f6f8;--card:#fff;--ok:#1e6b38;--sel:#eef3fb;--warn:#fff8dc}
 *{box-sizing:border-box}
@@ -132,6 +132,7 @@ header .lang select{width:auto;padding:5px 8px;font-size:13px;border-radius:6px;
 <div class="barra"><div>
   <span><span id="resumen"></span><br><span class="det"><span data-t="numero"></span>: <b id="numeroOC"></b></span></span>
   <span class="acoes">
+    <button class="btn sec" id="btnLimpar" type="button" data-t="limpiarPed"></button>
     <button class="btn sec" id="btnPedidos" type="button" data-t="misPedidos"></button>
     <button class="btn sec" id="btnGuardar" type="button" data-t="guardarBtn"></button>
     <button class="btn pri" id="revisar" type="button" disabled data-t="revisar"></button>
@@ -452,6 +453,13 @@ document.getElementById("pedTb").addEventListener("click", e => {
 document.getElementById("btnNovo").addEventListener("click", () => {
   if(Object.keys(itens).length && !confirm(T().confNuevo)) return;
   itens = {}; numero = ""; document.getElementById("obsGeneral").value = ""; soloSel = false; guardar(); mostrarNumero(); dlgPed.close(); desenhar(true);
+});
+// limpar pedido: esvazia produtos, nº, observações e Sus datos na tela (os pedidos salvos e os dados guardados continuam)
+document.getElementById("btnLimpar").addEventListener("click", () => {
+  if((Object.keys(itens).length || Object.values(datos).some(Boolean)) && !confirm(T().confLimpiar)) return;
+  itens = {}; numero = ""; document.getElementById("obsGeneral").value = ""; soloSel = false;
+  Object.keys(datos).forEach(k => delete datos[k]); mostrarDados();
+  guardar(); mostrarNumero(); desenhar(true); window.scrollTo({top: 0});
 });
 // o PDF gerado aqui leva o pedido inteiro (JSON em base64) no campo "Subject"; abrir o PDF devolve o pedido
 const paraB64 = o => btoa(unescape(encodeURIComponent(JSON.stringify(o))));
