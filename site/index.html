@@ -8,6 +8,7 @@
 <script src="config.js"></script>
 <script src="logo.js"></script>
 <script src="traducao.js"></script>
+<script src="idiomas.js"></script>
 <style>
 :root{--navy:#041243;--coral:#F16A64;--line:#d9dbe2;--muted:#6b7080;--bg:#f5f6f8;--card:#fff;--ok:#1e6b38;--sel:#eef3fb;--warn:#fff8dc}
 *{box-sizing:border-box}
@@ -70,6 +71,10 @@ dialog::backdrop{background:rgba(4,18,67,.45)}
 .miniaturas img{width:64px;height:52px;object-fit:contain;border:2px solid var(--line);border-radius:6px;cursor:pointer;background:#f0f1f4}
 .miniaturas img.on{border-color:var(--navy)}
 .nfotos{font-size:11px;color:var(--muted);margin-top:2px}
+header .lang{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:12px}
+header .lang select{width:auto;padding:5px 8px;font-size:13px;border-radius:6px;border:0}
+.tag{display:inline-block;font-size:10px;font-weight:700;border-radius:4px;padding:1px 5px;margin-left:6px;vertical-align:middle;font-family:"Segoe UI",Arial,sans-serif}
+.tag.novo{background:#e3f4e8;color:var(--ok)}.tag.sai{background:#fff1d6;color:#9a5b00}
 #aviso{display:none;background:#fdecea;color:#a3271f;border:1px solid #f5c2bd;border-radius:10px;padding:12px 14px;margin-bottom:16px}
 .ok{background:#e8f5ec;border:1px solid #b9dfc6;color:var(--ok);border-radius:10px;padding:12px 14px;font-size:14px}
 @media (max-width:600px){
@@ -77,52 +82,56 @@ dialog::backdrop{background:rgba(4,18,67,.45)}
   .foto{width:64px;height:52px}
   .cant{grid-column:1 / -1;justify-content:flex-end}
   header h1{font-size:16px}
+  header{gap:10px}
+  header img{height:30px}
+  header .sub,header .lang span{display:none}
 }
 </style>
 </head>
 <body>
 <header>
   <img id="logo" alt="Kapazi">
-  <div><h1>Hoja de Pedido Kapazi</h1><div class="sub">Exportación · elija los productos por código, descripción o foto</div></div>
+  <div><h1 data-t="titulo"></h1><div class="sub" data-t="sub"></div></div>
+  <label class="lang"><span data-t="idioma"></span><select id="idioma"></select></label>
 </header>
 <main>
   <div id="aviso"></div>
 
   <section class="card">
-    <h2>1. Sus datos</h2>
-    <p class="ayuda">Los campos con <b style="color:var(--coral)">*</b> son obligatorios. Los datos quedan guardados en este navegador para su próximo pedido.</p>
+    <h2 data-t="datos"></h2>
+    <p class="ayuda" data-t="datosAyuda"></p>
     <div class="grid" id="datos"></div>
   </section>
 
   <section class="card">
-    <h2>2. Productos</h2>
-    <p class="ayuda">Busque por código Kapazi o por descripción (ej.: <i>vinílica 60x40</i>, <i>césped</i>, <i>380203</i>) e indique la cantidad. Toque la foto para ampliarla.</p>
+    <h2 data-t="productos"></h2>
+    <p class="ayuda" data-t="productosAyuda"></p>
     <div class="busca">
-      <input id="q" type="search" placeholder="Buscar código o descripción…" autocomplete="off">
-      <button class="btn sec" id="soloSel" type="button">Ver solo seleccionados</button>
+      <input id="q" type="search" autocomplete="off">
+      <button class="btn sec" id="soloSel" type="button"></button>
     </div>
     <div class="chips" id="chips"></div>
-    <div class="lista" id="lista"><div class="vacio">Cargando catálogo…</div></div>
-    <button class="btn sec mas" id="mas" type="button" style="display:none">Mostrar más productos</button>
+    <div class="lista" id="lista"><div class="vacio" data-t="cargando"></div></div>
+    <button class="btn sec mas" id="mas" type="button" style="display:none"></button>
   </section>
 </main>
 
 <div class="barra"><div>
-  <span id="resumen">Ningún producto seleccionado</span>
-  <button class="btn pri" id="revisar" type="button" disabled>Revisar y descargar PDF</button>
+  <span id="resumen"></span>
+  <button class="btn pri" id="revisar" type="button" disabled data-t="revisar"></button>
 </div></div>
 
 <dialog id="dlgRev">
-  <div class="dh">Revisar pedido <button class="btn sec" type="button" onclick="dlgRev.close()">✕</button></div>
+  <div class="dh"><span data-t="revTitulo"></span> <button class="btn sec" type="button" onclick="dlgRev.close()">✕</button></div>
   <div class="db">
     <div id="revFaltan"></div>
-    <table><thead><tr><th>Código</th><th>Descripción</th><th>Unidad</th><th style="text-align:right">Cantidad</th><th>Observación</th><th></th></tr></thead><tbody id="revTb"></tbody></table>
-    <div style="margin-top:14px"><label for="obsGeneral">Observaciones generales del pedido</label><textarea id="obsGeneral" placeholder="Ej.: fecha deseada de embarque, mezcla de colores, etiquetado…"></textarea></div>
+    <table><thead><tr><th data-t="cod"></th><th data-t="desc"></th><th data-t="unidad"></th><th style="text-align:right" data-t="cant"></th><th data-t="obs"></th><th></th></tr></thead><tbody id="revTb"></tbody></table>
+    <div style="margin-top:14px"><label for="obsGeneral" data-t="obsGen"></label><textarea id="obsGeneral"></textarea></div>
     <div id="revOk" style="margin-top:14px;display:none" class="ok"></div>
   </div>
   <div class="df">
-    <button class="btn sec" type="button" onclick="dlgRev.close()">Seguir eligiendo</button>
-    <button class="btn pri" id="pdf" type="button">Descargar PDF del pedido</button>
+    <button class="btn sec" type="button" onclick="dlgRev.close()" data-t="seguir"></button>
+    <button class="btn pri" id="pdf" type="button" data-t="descargar"></button>
   </div>
 </dialog>
 
@@ -130,20 +139,17 @@ dialog::backdrop{background:rgba(4,18,67,.45)}
 
 <script>
 "use strict";
-/* Hoja de Pedido online (pública, sem login). O cliente escolhe os produtos e baixa um PDF que o
-   "Importar pedido do cliente" do gerador lê direto: marca KZ-PED, cabeçalho CÓDIGO / CANTIDAD e só
-   as linhas com quantidade. Catálogo: função catalogo_pedido() do Supabase do gerador (sem preços); se ela
-   não responder, vale a cópia em catalogo.json (ferramentas/gerar_catalogo.js), que também traz fotos extras. */
+/* Hoja de Pedido online (pública, sem login), em espanhol, português ou inglês. O cliente escolhe os produtos e
+   baixa um PDF que o "Importar pedido do cliente" do gerador lê direto: marca KZ-PED, cabeçalho CÓDIGO (ou
+   PRODUCT CODE) / CANTIDAD (QUANTIDADE, QUANTITY) e só as linhas com quantidade.
+   Produtos: função catalogo_pedido() do Supabase do gerador (sem preços; reserva: catalogo.json) + os da
+   tabela ATACADO que não estão no gerador (produtos_extra.json). Fotos: planilha SKUImagens (imagens.json). */
 const URL_JSPDF = "https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js";
 const URL_AUTOTABLE = "https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js";
 const CONTATO = "cassiano.pajewski@kapazi.com.br";
 const MARCA = "KZ-PED v1";
-const CAMPOS = [
-  ["empresa", "Empresa / razón social", true], ["codCliente", "Código de cliente Kapazi (si lo tiene)"],
-  ["docFiscal", "RUC / NIT / CUIT / Tax ID"], ["pais", "País", true], ["ciudad", "Ciudad"], ["direccion", "Dirección"],
-  ["contacto", "Persona de contacto", true], ["email", "E-mail", true, "email"], ["telefono", "Teléfono / WhatsApp"],
-  ["oc", "Nº de orden de compra (su referencia)"], ["incoterm", "Incoterm deseado", false, "select", ["", "FOB", "CFR", "CIF", "EXW", "FCA", "CPT", "CIP", "DAP", "DDP"]],
-  ["destino", "Puerto / ciudad de destino"]];
+const CAMPOS = [["empresa", true], ["codCliente"], ["docFiscal"], ["pais", true], ["ciudad"], ["direccion"], ["contacto", true], ["email", true, "email"],
+  ["telefono"], ["oc"], ["incoterm", false, "select", ["", "FOB", "CFR", "CIF", "EXW", "FCA", "CPT", "CIP", "DAP", "DDP"]], ["destino"]];
 const LS = {
   get(k, d){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch(e){ return d; } },
   set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
@@ -160,10 +166,28 @@ let itens = salvo.itens || {};   // cod -> {qtd, obs}
 const params = new URLSearchParams(location.search);
 if(params.get("cliente")) datos.codCliente = params.get("cliente");
 if(params.get("empresa")) datos.empresa = params.get("empresa");
-const guardar = () => LS.set("kz_pedido_v1", {datos, itens, obs: document.getElementById("obsGeneral").value});
+const navegador = (navigator.language || "").slice(0, 2);
+let idioma = IDIOMAS[params.get("lang")] ? params.get("lang") : IDIOMAS[salvo.idioma] ? salvo.idioma : navegador === "pt" ? "pt" : navegador === "en" ? "en" : "es";
+const T = () => TXT[idioma];
+const guardar = () => LS.set("kz_pedido_v1", {datos, itens, idioma, obs: document.getElementById("obsGeneral").value});
 
-/* ---------- datos del cliente ---------- */
-document.getElementById("datos").innerHTML = CAMPOS.map(([k, rot, obr, tipo, ops]) => `<div><label for="d_${k}">${esc(rot)}${obr ? " <b>*</b>" : ""}</label>${
+/* ---------- idioma ---------- */
+const descEm = (p, l = idioma) => l === "pt" ? p.pt : l === "es" ? p.es : (p.en || (p.en = traduzirEN(p.pt)));
+function aplicarIdioma(){
+  const t = T();
+  document.documentElement.lang = idioma; document.title = t.titulo;
+  document.querySelectorAll("[data-t]").forEach(el => { el.textContent = t[el.dataset.t]; });
+  document.getElementById("q").placeholder = t.buscar;
+  document.getElementById("obsGeneral").placeholder = t.obsGenPh;
+  CAMPOS.forEach(([k, obr]) => { document.querySelector(`label[for="d_${k}"]`).innerHTML = esc(t.campos[k]) + (obr ? " <b>*</b>" : ""); });
+  if(CAT.length){ montarCategorias(); desenhar(false); if(dlgRev.open) desenharRevisao(); }
+}
+document.getElementById("idioma").innerHTML = Object.entries(IDIOMAS).map(([k, n]) => `<option value="${k}">${n}</option>`).join("");
+document.getElementById("idioma").value = idioma;
+document.getElementById("idioma").addEventListener("change", e => { idioma = e.target.value; categoria = ""; guardar(); aplicarIdioma(); });
+
+/* ---------- dados do cliente ---------- */
+document.getElementById("datos").innerHTML = CAMPOS.map(([k, obr, tipo, ops]) => `<div><label for="d_${k}"></label>${
   tipo === "select" ? `<select id="d_${k}">${ops.map(o => `<option value="${o}">${o || "—"}</option>`).join("")}</select>`
   : `<input id="d_${k}" type="${tipo || "text"}" autocomplete="${{empresa:"organization", email:"email", telefono:"tel", contacto:"name", pais:"country-name", ciudad:"address-level2", direccion:"street-address"}[k] || "off"}">`}</div>`).join("");
 CAMPOS.forEach(([k]) => { const el = document.getElementById("d_" + k); el.value = datos[k] || ""; el.addEventListener("input", () => { datos[k] = el.value.trim(); el.classList.remove("falta"); guardar(); }); });
@@ -173,46 +197,52 @@ if(window.LOGO_KAPAZI) document.getElementById("logo").src = window.LOGO_KAPAZI;
 
 /* ---------- catálogo ---------- */
 function aviso(msg){ const a = document.getElementById("aviso"); a.innerHTML = msg; a.style.display = msg ? "" : "none"; }
-async function carregarCopia(){
-  const r = await fetch("catalogo.json", {cache: "no-cache"});
-  if(!r.ok) throw new Error("HTTP " + r.status);
-  return (await r.json()).produtos;
+async function lerJson(url){ const r = await fetch(url, {cache: "no-cache"}); if(!r.ok) throw new Error(url + ": HTTP " + r.status); return r.json(); }
+// produto do gerador / da tabela ATACADO -> {cod, pt, es, unidade, base} (unidade sugerida como no gerador, em espanhol)
+function produto(cod, descPT, um, descES){
+  const s = sugerirUnidade({um, desc: descPT || ""});
+  return {cod, pt: descPT || cod, es: ((descES || traduzir(descPT || "")).trim() || cod), unidade: s.unidade, base: s.baseFator || ""};
 }
 async function carregarBanco(){
   const c = window.PEDIDOS_CFG;
   const r = await fetch(c.url + "/rest/v1/rpc/catalogo_pedido", {method: "POST", headers: {apikey: c.key, "Content-Type": "application/json"}, body: "{}"});
   if(!r.ok) throw new Error("HTTP " + r.status);
-  const vistos = new Set();
-  return (await r.json()).filter(p => p && p.cod && !vistos.has(p.cod) && vistos.add(p.cod)).map(p => {
-    const s = sugerirUnidade({um: p.um, desc: p.descricao || ""}), desc = (p.descricao_es || traduzir(p.descricao || "")).trim() || p.cod;
-    return {cod: p.cod, desc, pt: p.descricao && p.descricao !== desc ? p.descricao : "", unidade: s.unidade, base: s.baseFator || "", foto: p.foto_url || ""};
-  });
+  return (await r.json()).filter(p => p && p.cod).map(p => ({...produto(p.cod, p.descricao, p.um, p.descricao_es), foto: p.foto_url || ""}));
 }
-// todas as fotos de cada código (planilha SKUImagens do site Kapazi, ferramentas/gerar_imagens.py)
+const daCopia = p => ({cod: p.cod, pt: p.pt || p.desc, es: p.desc, unidade: p.unidade, base: p.base, foto: p.foto || ""});
 async function carregarImagens(){
-  const r = await fetch("imagens.json", {cache: "no-cache"});
-  if(!r.ok) throw new Error("HTTP " + r.status);
-  const j = await r.json(); return cod => { const k = chave(cod), l = j.img[k] || j.img[k.replace(/^0+/, "")]; return l ? l.map(n => j.base + n) : []; };
+  const j = await lerJson("imagens.json");
+  return cod => { const k = chave(cod), l = j.img[k] || j.img[k.replace(/^0+/, "")]; return l ? l.map(n => j.base + n) : []; };
 }
 // banco do gerador (sempre atualizado); a cópia completa as fotos e serve de reserva se o banco não responder;
-// as fotos da planilha SKUImagens vêm primeiro
+// depois entram os produtos da tabela ATACADO que o gerador não tem; as fotos da planilha SKUImagens vêm primeiro
 async function carregarCatalogo(){
-  const [banco, copia, imagens] = await Promise.allSettled([carregarBanco(), carregarCopia(), carregarImagens()]);
-  const fotos = new Map((copia.value || []).map(p => [p.cod, p.foto])), imgs = imagens.value || (() => []);
+  const [banco, copia, extra, imagens] = await Promise.allSettled([carregarBanco(), lerJson("catalogo.json"), lerJson("produtos_extra.json"), carregarImagens()]);
+  const cop = copia.status === "fulfilled" ? copia.value.produtos.map(daCopia) : [];
+  const fotoCop = new Map(cop.map(p => [p.cod, p.foto])), imgs = imagens.value || (() => []);
   let l;
-  if(banco.status === "fulfilled" && banco.value.length) l = banco.value.map(p => p.foto ? p : {...p, foto: fotos.get(p.cod) || ""});
-  else if(copia.status === "fulfilled") l = copia.value;
-  else throw banco.reason;
+  if(banco.status === "fulfilled" && banco.value.length) l = banco.value.map(p => p.foto ? p : {...p, foto: fotoCop.get(p.cod) || ""});
+  else if(cop.length) l = cop;
+  else if(extra.status !== "fulfilled") throw banco.reason;
+  else l = [];
+  const vistos = new Set();
+  l = l.filter(p => !vistos.has(chave(p.cod)) && vistos.add(chave(p.cod)));
+  const st = {"LANÇAMENTO": "novo", "SAINDO DE LINHA": "sai"};
+  (extra.value || []).forEach(p => { if(vistos.has(chave(p.cod))) return; vistos.add(chave(p.cod)); l.push({...produto(p.cod, p.descricao, p.um), foto: "", status: st[p.status] || "", extra: true}); });
   return l.map(p => { const fs = imgs(p.cod); return fs.length ? {...p, foto: fs[0], fotos: fs} : {...p, fotos: p.foto ? [p.foto] : []}; });
 }
-function prepararCatalogo(linhas){
-  CAT = linhas.map(p => ({...p, k: chave(p.cod), busca: norm(p.cod + " " + p.desc + " " + (p.pt || "")).replace(/,/g, "."),
-    cat: (p.desc.match(/^[^\s\d(]+(\s+(DE|DEL)\s+[^\s\d(]+)?/) || [""])[0]}));
+function prepararCatalogo(lista){
+  CAT = lista.map(p => ({...p, k: chave(p.cod), busca: norm([p.cod, p.pt, p.es, traduzirEN(p.pt)].join(" ")).replace(/,/g, ".")}));
   porCod = new Map(CAT.map(p => [p.cod, p]));
   Object.keys(itens).forEach(cod => { if(!porCod.has(cod)) delete itens[cod]; });   // produto saiu do catálogo
-  const conta = {}; CAT.forEach(p => { if(p.cat) conta[p.cat] = (conta[p.cat] || 0) + 1; });
+  montarCategorias();
+}
+const catDe = p => (descEm(p).match(/^[^\s\d(]+(\s+(DE|DEL|OF)\s+[^\s\d(]+)?/) || [""])[0];
+function montarCategorias(){
+  const conta = {}; CAT.forEach(p => { const c = catDe(p); if(c) conta[c] = (conta[c] || 0) + 1; });
   const cats = Object.entries(conta).filter(([, n]) => n >= 5).sort((a, b) => b[1] - a[1]).slice(0, 12).map(([c]) => c);
-  document.getElementById("chips").innerHTML = ['<button class="chip on" type="button" data-c="">Todos</button>', ...cats.map(c => `<button class="chip" type="button" data-c="${esc(c)}">${esc(c.charAt(0) + c.slice(1).toLowerCase())}</button>`)].join("");
+  document.getElementById("chips").innerHTML = [`<button class="chip${categoria ? "" : " on"}" type="button" data-c="">${esc(T().todos)}</button>`,
+    ...cats.map(c => `<button class="chip${c === categoria ? " on" : ""}" type="button" data-c="${esc(c)}">${esc(c.charAt(0) + c.slice(1).toLowerCase())}</button>`)].join("");
 }
 // fotos do site Kapazi passam pelo /api/foto (o navegador não lê o digitaloceanspaces direto); as demais estão em fotos/
 const srcUrl = u => !u ? "" : /^https:\/\/[^/]+\.digitaloceanspaces\.com\//.test(u) ? "/api/foto?url=" + encodeURIComponent(u) : u;
@@ -229,31 +259,30 @@ function marcar(texto, q){
 }
 function filtrados(){
   const ws = norm(filtro).replace(/,/g, ".").split(/\s+/).filter(Boolean), k = chave(filtro);
-  let l = CAT.filter(p => (!soloSel || itens[p.cod]) && (!categoria || p.cat === categoria) && (!ws.length || ws.every(w => p.busca.includes(w)) || (k.length >= 3 && p.k.includes(k))));
+  let l = CAT.filter(p => (!soloSel || itens[p.cod]) && (!categoria || catDe(p) === categoria) && (!ws.length || ws.every(w => p.busca.includes(w)) || (k.length >= 3 && p.k.includes(k))));
   if(k.length >= 3) l = l.slice().sort((a, b) => (b.k.startsWith(k) - a.k.startsWith(k)));   // código digitado vem primeiro
   return l;
 }
 function linhaProd(p){
-  const it = itens[p.cod], f = srcFoto(p);
+  const it = itens[p.cod], f = srcFoto(p), t = T();
   return `<div class="prod${it ? " sel" : ""}" data-cod="${esc(p.cod)}">
-    <div><div class="foto" data-z="1">${f ? `<img loading="lazy" src="${esc(f)}" alt="" onerror="this.remove()">` : "sin foto"}</div>${p.fotos.length > 1 ? `<div class="nfotos">${p.fotos.length} fotos</div>` : ""}</div>
-    <div><div class="cod">${marcar(p.cod, filtro)}</div><div class="desc">${marcar(p.desc, filtro)}</div>${p.base ? `<div class="det">${esc(p.base)}</div>` : ""}</div>
-    <div class="cant"><button type="button" data-d="-1" aria-label="menos">−</button><input inputmode="decimal" value="${it ? fmtQ(it.qtd) : ""}" placeholder="0" aria-label="Cantidad ${esc(p.cod)}"><button type="button" data-d="1" aria-label="más">+</button><span class="un">${esc(p.unidade)}</span></div>
+    <div><div class="foto" data-z="1">${f ? `<img loading="lazy" src="${esc(f)}" alt="" onerror="this.remove()">` : esc(t.sinFoto)}</div>${p.fotos.length > 1 ? `<div class="nfotos">${esc(t.fotos(p.fotos.length))}</div>` : ""}</div>
+    <div><div class="cod">${marcar(p.cod, filtro)}${p.status === "novo" ? `<span class="tag novo">${esc(t.nuevo)}</span>` : p.status === "sai" ? `<span class="tag sai">${esc(t.saliendo)}</span>` : ""}</div><div class="desc">${marcar(descEm(p), filtro)}</div>${p.base ? `<div class="det">${esc(baseEm(p.base, idioma))}</div>` : ""}</div>
+    <div class="cant"><button type="button" data-d="-1" aria-label="-">−</button><input inputmode="decimal" value="${it ? fmtQ(it.qtd) : ""}" placeholder="0" aria-label="${esc(t.cant)} ${esc(p.cod)}"><button type="button" data-d="1" aria-label="+">+</button><span class="un">${esc(unidadeEm(p.unidade, idioma))}</span></div>
   </div>`;
 }
 function desenhar(voltarTopo){
-  const l = filtrados(), el = document.getElementById("lista");
+  const l = filtrados(), el = document.getElementById("lista"), t = T();
   if(voltarTopo) mostrar = 40;
-  el.innerHTML = l.length ? l.slice(0, mostrar).map(linhaProd).join("")
-    : `<div class="vacio">${soloSel ? "Todavía no eligió productos." : "Ningún producto encontrado. Pruebe con otra palabra o con el código."}</div>`;
-  const mas = document.getElementById("mas"); mas.style.display = l.length > mostrar ? "" : "none"; mas.textContent = `Mostrar más productos (${l.length - mostrar} más)`;
+  el.innerHTML = l.length ? l.slice(0, mostrar).map(linhaProd).join("") : `<div class="vacio">${esc(soloSel ? t.ningunoSel : t.ninguno)}</div>`;
+  const mas = document.getElementById("mas"); mas.style.display = l.length > mostrar ? "" : "none"; mas.textContent = t.mas(l.length - mostrar);
   resumo();
 }
 function resumo(){
-  const n = Object.keys(itens).length;
-  document.getElementById("resumen").textContent = n ? `${n} producto(s) seleccionado(s)` : "Ningún producto seleccionado";
+  const n = Object.keys(itens).length, t = T();
+  document.getElementById("resumen").textContent = t.resumen(n);
   document.getElementById("revisar").disabled = !n;
-  document.getElementById("soloSel").textContent = soloSel ? "Ver todos los productos" : `Ver solo seleccionados${n ? " (" + n + ")" : ""}`;
+  document.getElementById("soloSel").textContent = soloSel ? t.verTodos : t.soloSel + (n ? " (" + n + ")" : "");
 }
 function definirQtd(cod, qtd){
   const linha = document.querySelector(`.prod[data-cod="${CSS.escape(cod)}"]`);
@@ -264,8 +293,8 @@ function definirQtd(cod, qtd){
 function abrirFotos(p){
   if(!p.fotos.length) return;
   const ver = i => { document.getElementById("zoomI").src = srcUrl(p.fotos[i]); document.querySelectorAll("#zoomM img").forEach((m, k) => m.classList.toggle("on", k === i)); };
-  document.getElementById("zoomT").textContent = p.cod + " – " + p.desc;
-  document.getElementById("zoomM").innerHTML = p.fotos.length > 1 ? p.fotos.map((u, i) => `<img src="${esc(srcUrl(u))}" alt="Foto ${i + 1}" data-i="${i}" loading="lazy">`).join("") : "";
+  document.getElementById("zoomT").textContent = p.cod + " – " + descEm(p);
+  document.getElementById("zoomM").innerHTML = p.fotos.length > 1 ? p.fotos.map((u, i) => `<img src="${esc(srcUrl(u))}" alt="${i + 1}" data-i="${i}" loading="lazy">`).join("") : "";
   document.getElementById("zoomM").onclick = e => { const m = e.target.closest("img[data-i]"); if(m) ver(+m.dataset.i); };
   ver(0); zoom.showModal();
 }
@@ -289,17 +318,17 @@ document.getElementById("chips").addEventListener("click", e => {
 
 /* ---------- revisar ---------- */
 const dlgRev = document.getElementById("dlgRev"), zoom = document.getElementById("zoom");
-function selecionados(){ return CAT.filter(p => itens[p.cod]).map(p => ({...p, qtd: itens[p.cod].qtd, obs: itens[p.cod].obs || ""})); }
-function faltando(){ return CAMPOS.filter(([k, , obr]) => obr && !datos[k]).map(([k, rot]) => ({k, rot})); }
+function selecionados(){ return CAT.filter(p => itens[p.cod]).map(p => ({...p, desc: descEm(p), un: unidadeEm(p.unidade, idioma), qtd: itens[p.cod].qtd, obs: itens[p.cod].obs || ""})); }
+function faltando(){ return CAMPOS.filter(([k, obr]) => obr && !datos[k]).map(([k]) => ({k, rot: T().campos[k]})); }
 function desenharRevisao(){
-  const sel = selecionados();
+  const sel = selecionados(), t = T();
   document.getElementById("revTb").innerHTML = sel.map(p => `<tr data-cod="${esc(p.cod)}">
-    <td class="cod">${esc(p.cod)}</td><td>${esc(p.desc)}</td><td>${esc(p.unidade)}</td>
+    <td class="cod">${esc(p.cod)}</td><td>${esc(p.desc)}</td><td>${esc(p.un)}</td>
     <td class="n"><input inputmode="decimal" value="${fmtQ(p.qtd)}" style="width:80px;text-align:right" data-f="qtd"></td>
-    <td><input value="${esc(p.obs)}" placeholder="opcional" data-f="obs" maxlength="80"></td>
-    <td><button class="x" type="button" title="Quitar">✕</button></td></tr>`).join("") || `<tr><td colspan="6" class="vacio">Ningún producto.</td></tr>`;
+    <td><input value="${esc(p.obs)}" placeholder="${esc(t.opcional)}" data-f="obs" maxlength="80"></td>
+    <td><button class="x" type="button" title="${esc(t.quitar)}">✕</button></td></tr>`).join("") || `<tr><td colspan="6" class="vacio">${esc(t.ningunoSel)}</td></tr>`;
   const f = faltando();
-  document.getElementById("revFaltan").innerHTML = f.length ? `<div id="aviso2" style="background:#fff8dc;border:1px solid #ecd98b;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:14px">Complete sus datos antes de descargar: <b>${f.map(x => esc(x.rot)).join(", ")}</b>.</div>` : "";
+  document.getElementById("revFaltan").innerHTML = f.length ? `<div style="background:#fff8dc;border:1px solid #ecd98b;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:14px">${esc(t.completar)} <b>${f.map(x => esc(x.rot)).join(", ")}</b>.</div>` : "";
   document.getElementById("pdf").disabled = !sel.length;
 }
 document.getElementById("revisar").addEventListener("click", () => { document.getElementById("revOk").style.display = "none"; desenharRevisao(); dlgRev.showModal(); });
@@ -327,14 +356,14 @@ function logoJpeg(src){ return new Promise(ok => { const i = new Image(); i.onlo
   const g = c.getContext("2d"); g.fillStyle = "#041243"; g.fillRect(0, 0, c.width, c.height); g.drawImage(i, 0, 0, c.width, c.height);
   ok({src: c.toDataURL("image/jpeg", .9), w: c.width, h: c.height}); }; i.onerror = () => ok(null); i.src = src; }); }
 async function gerarPdf(){
-  const f = faltando();
+  const f = faltando(), t = T(), tp = t.pdf;
   if(f.length){
     dlgRev.close(); f.forEach(x => document.getElementById("d_" + x.k).classList.add("falta"));
     document.getElementById("d_" + f[0].k).focus(); document.getElementById("d_" + f[0].k).scrollIntoView({block: "center"});
     return;
   }
   const sel = selecionados(); if(!sel.length) return;
-  const btn = document.getElementById("pdf"); btn.disabled = true; btn.textContent = "Generando PDF…";
+  const btn = document.getElementById("pdf"); btn.disabled = true; btn.textContent = t.generando;
   try{
     await carregarScript(URL_JSPDF); await carregarScript(URL_AUTOTABLE);
     const {jsPDF} = window.jspdf, doc = new jsPDF({unit: "mm", format: "a4", compress: true});
@@ -342,13 +371,13 @@ async function gerarPdf(){
     // faixa do topo: logo, título e a marca KZ-PED (o gerador reconhece a hoja de pedido por ela)
     doc.setFillColor(...NAVY); doc.rect(0, 0, W, 24, "F");
     if(window.LOGO_KAPAZI){ const d = await logoJpeg(window.LOGO_KAPAZI); if(d){ const h = 16, w = Math.min(50, h * d.w / d.h); doc.addImage(d.src, "JPEG", M, 4, w, h); } }
-    doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.setFontSize(16); doc.text("HOJA DE PEDIDO", W - M, 12, {align: "right"});
-    doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.text(`${MARCA}   Fecha ${fecha}`, W - M, 18, {align: "right"});
+    doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.setFontSize(16); doc.text(tp.titulo, W - M, 12, {align: "right"});
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.text(`${MARCA}   ${tp.fecha} ${fecha}`, W - M, 18, {align: "right"});
     // dados do cliente em duas colunas (rótulo e valor separados)
     doc.setTextColor(30, 32, 48);
-    const pares = CAMPOS.filter(([k]) => datos[k]).map(([k, rot]) => [rot.replace(/\s*\(.*\)$/, ""), datos[k]]);
+    const pares = CAMPOS.filter(([k]) => datos[k]).map(([k]) => [t.campos[k].replace(/\s*\(.*\)$/, ""), datos[k]]);
     let y = 32;
-    doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...CORAL); doc.text("DATOS DEL CLIENTE", M, y); y += 5;
+    doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...CORAL); doc.text(tp.cliente, M, y); y += 5;
     doc.setFontSize(8.5); doc.setTextColor(30, 32, 48);
     const col = [M, W / 2 + 2], larg = W / 2 - M - 2;
     doc.setFont("helvetica", "bold"); const dx = Math.max(20, ...pares.map(p => doc.getTextWidth(p[0] + ":"))) + 3;
@@ -359,18 +388,21 @@ async function gerarPdf(){
         doc.setFont("helvetica", "normal"); const v = doc.splitTextToSize(String(par[1]), larg - dx); doc.text(v, col[j] + dx, y); alt = Math.max(alt, v.length); });
       y += 4.6 * Math.max(1, alt);
     }
-    // código nunca quebra linha (o importador lê o código da 1ª linha de cada item)
+    // código, cabeçalho e quantidade nunca quebram linha: o importador acha as colunas pelo cabeçalho
+    // e lê o código e a quantidade da 1ª linha de cada item
     doc.setFont("helvetica", "bold"); doc.setFontSize(8);
-    const largCod = Math.max(22, ...sel.map(p => doc.getTextWidth(p.cod))) + 4.5;
-    // itens: cabeçalho CÓDIGO / CANTIDAD (o importador acha as colunas por ele); uma linha por produto, alinhada no topo
+    const larg1 = (txts) => Math.max(...txts.map(x => doc.getTextWidth(String(x)))) + 4.5;
+    const cab = tp.cab, largCod = Math.max(22, larg1([cab[1], ...sel.map(p => p.cod)])), largQtd = Math.max(18, larg1([cab[4], ...sel.map(p => fmtQ(p.qtd))]));
+    const largUn = Math.max(16, larg1([cab[3], ...sel.map(p => p.un)]));
     doc.autoTable({
       startY: y + 3, margin: {left: M, right: M, bottom: 16},
-      head: [["Nº", "CÓDIGO", "DESCRIPCIÓN", "UNIDAD", "CANTIDAD", "OBSERVACIÓN"]],
-      body: sel.map((p, i) => [String(i + 1), p.cod, p.desc, p.unidade, fmtQ(p.qtd), p.obs || ""]),
+      head: [cab],
+      body: sel.map((p, i) => [String(i + 1), p.cod, p.desc, p.un, fmtQ(p.qtd), p.obs || ""]),
       styles: {font: "helvetica", fontSize: 8, cellPadding: 1.6, valign: "top", lineColor: [200, 202, 210], lineWidth: 0.1, textColor: [30, 32, 48]},
-      headStyles: {fillColor: NAVY, textColor: 255, fontStyle: "bold", valign: "middle"},
+      headStyles: {fillColor: NAVY, textColor: 255, fontStyle: "bold", valign: "middle", overflow: "visible"},
       alternateRowStyles: {fillColor: [243, 246, 251]},
-      columnStyles: {0: {cellWidth: 9, halign: "right"}, 1: {cellWidth: largCod, fontStyle: "bold", overflow: "visible"}, 2: {cellWidth: "auto"}, 3: {cellWidth: 18}, 4: {cellWidth: 20, halign: "right", fontStyle: "bold"}, 5: {cellWidth: 38}},
+      columnStyles: {0: {cellWidth: 9, halign: "right"}, 1: {cellWidth: largCod, fontStyle: "bold", overflow: "visible"}, 2: {cellWidth: "auto"}, 3: {cellWidth: largUn},
+        4: {cellWidth: largQtd, halign: "right", fontStyle: "bold", overflow: "visible"}, 5: {cellWidth: 34}},
       showHead: "everyPage"
     });
     y = doc.lastAutoTable.finalY + 6;
@@ -378,27 +410,28 @@ async function gerarPdf(){
     if(obs){
       const linhas = doc.splitTextToSize(obs, W - 2 * M);
       if(y + 8 + linhas.length * 4 > 280){ doc.addPage(); y = 20; }
-      doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...CORAL); doc.text("OBSERVACIONES", M, y); y += 5;
+      doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...CORAL); doc.text(tp.obs, M, y); y += 5;
       doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(30, 32, 48); doc.text(linhas, M, y); y += linhas.length * 4;
     }
     // rodapé em todas as páginas
     const n = doc.getNumberOfPages();
     for(let i = 1; i <= n; i++){
       doc.setPage(i); doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(107, 112, 128);
-      doc.text(`Total: ${sel.length} producto(s). Envíe este PDF a ${CONTATO}. Precios y condiciones se confirman en la proforma.`, M, 290);
-      doc.text(`Página ${i} de ${n}`, W - M, 290, {align: "right"});
+      doc.text(tp.pie(sel.length, CONTATO), M, 290);
+      doc.text(tp.pag(i, n), W - M, 290, {align: "right"});
     }
-    const nome = `Pedido Kapazi - ${(datos.empresa || "cliente").replace(/[\\/:*?"<>|]/g, "-").slice(0, 60)} - ${hojeISO()}.pdf`;
+    const nome = `${tp.archivo} - ${(datos.empresa || "cliente").replace(/[\\/:*?"<>|]/g, "-").slice(0, 60)} - ${hojeISO()}.pdf`;
     doc.save(nome);
     const ok = document.getElementById("revOk"); ok.style.display = "";
-    ok.innerHTML = `PDF descargado: <b>${esc(nome)}</b>. Envíelo por e-mail a <a href="mailto:${CONTATO}?subject=${encodeURIComponent("Pedido " + (datos.empresa || "") + (datos.oc ? " – OC " + datos.oc : ""))}">${CONTATO}</a> o a su contacto en Kapazi, adjuntando el archivo.`;
-  }catch(e){ alert("No se pudo generar el PDF: " + (e && e.message || e)); }
-  finally{ btn.disabled = false; btn.textContent = "Descargar PDF del pedido"; }
+    ok.innerHTML = t.listo(esc(nome), CONTATO, `mailto:${CONTATO}?subject=${encodeURIComponent(tp.asunto + " " + (datos.empresa || "") + (datos.oc ? " – " + datos.oc : ""))}`);
+  }catch(e){ alert(t.errorPdf + (e && e.message || e)); }
+  finally{ btn.disabled = false; btn.textContent = t.descargar; }
 }
 document.getElementById("pdf").addEventListener("click", gerarPdf);
 
+aplicarIdioma(); resumo();
 carregarCatalogo().then(l => { prepararCatalogo(l); desenhar(true); })
-  .catch(e => { aviso("No fue posible cargar el catálogo de productos. Verifique su conexión e intente de nuevo en unos minutos. Si el problema continúa, escriba a <a href=\"mailto:" + CONTATO + "\">" + CONTATO + "</a>."); document.getElementById("lista").innerHTML = ""; console.error(e); });
+  .catch(e => { aviso(esc(T().errorCat) + ` <a href="mailto:${CONTATO}">${CONTATO}</a>.`); document.getElementById("lista").innerHTML = ""; console.error(e); });
 </script>
 </body>
 </html>

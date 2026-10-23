@@ -39,7 +39,7 @@ function importadorDoGerador(){
 (async () => {
   const base = `http://localhost:${srv.address().port}`;
   const nav = await chromium.launch();
-  const ctx = await nav.newContext({acceptDownloads: true});
+  const ctx = await nav.newContext({acceptDownloads: true, locale: "es-ES"});
   await ctx.route(/^https?:\/\/(?!localhost)/, r => r.abort());
   // BANCO=<json do catalogo_pedido()>: simula o Supabase do gerador; sem ele o site usa a cópia (catalogo.json)
   let chamadasBanco = 0;
@@ -52,8 +52,10 @@ function importadorDoGerador(){
 
   await pg.goto(base + "/?cliente=007700");
   await pg.waitForSelector(".prod");
-  confere(await pg.$$eval(".prod", l => l.length) > 0 && await pg.evaluate(() => CAT.length) === catalogo.length, `catálogo carregado (${catalogo.length} produtos)` + (process.env.BANCO ? "" : " pela cópia, sem o banco"));
-  if(process.env.BANCO) confere(chamadasBanco === 1 && await pg.evaluate(() => CAT.filter(p => p.foto).length) === catalogo.filter(p => p.foto).length, "lido do banco do gerador, com as fotos extras da cópia");
+  const nCat = await pg.evaluate(() => ({total: CAT.length, extra: CAT.filter(p => p.extra).length}));
+  console.log("     catálogo:", nCat.total, "produtos,", nCat.extra, "da tabela ATACADO");
+  confere(await pg.$$eval(".prod", l => l.length) > 0 && nCat.total - nCat.extra === catalogo.length && nCat.extra > 0, `catálogo carregado (${catalogo.length} do gerador` + (process.env.BANCO ? "" : ", pela cópia") + " + produtos da tabela ATACADO)");
+  if(process.env.BANCO) confere(chamadasBanco === 1 && await pg.evaluate(cods => cods.every(c => porCod.get(c).foto), catalogo.filter(p => p.foto).map(p => p.cod)), "lido do banco do gerador, com as fotos extras da cópia");
   confere(await pg.$$eval(".prod", l => l.length) === 40, "lista mostra os primeiros 40 produtos");
   confere(await pg.inputValue("#d_codCliente") === "007700", "?cliente= preenche o código de cliente");
 
@@ -61,10 +63,10 @@ function importadorDoGerador(){
   const gal = await pg.evaluate(() => { const p = CAT.find(p => p.fotos.length > 2); if(!p) return null; abrirFotos(p); return {n: p.fotos.length, mini: document.querySelectorAll("#zoomM img").length, src: document.getElementById("zoomI").getAttribute("src")}; });
   confere(gal && gal.mini === gal.n && /^\/api\/foto\?url=/.test(gal.src), `galeria com todas as fotos do produto (${gal && gal.n})`);
   await pg.evaluate(() => zoom.close());
-  console.log("     produtos com foto:", await pg.evaluate(() => CAT.filter(p => p.foto).length), "de", catalogo.length);
+  console.log("     produtos com foto:", await pg.evaluate(() => CAT.filter(p => p.foto).length + " de " + CAT.length));
 
   // busca por código e por descrição em espanhol
-  const c1 = catalogo.find(p => p.unidade === "PIEZA").cod, c2 = catalogo.find(p => p.unidade === "ROLLO" && /,/.test(p.desc)).cod;
+  const c1 = catalogo.find(p => p.unidade === "PIEZA").cod, c2 = await pg.evaluate(() => CAT.find(p => p.extra && p.unidade === "ROLLO" && /,/.test(p.pt)).cod);
   await pg.fill("#q", c1); await pg.waitForTimeout(300);
   confere(await pg.$eval(".prod .cod", e => e.textContent) === c1, `buscar o código ${c1} traz o produto primeiro`);
   await pg.fill(`.prod[data-cod="${c1}"] input`, "12");
@@ -103,11 +105,11 @@ function importadorDoGerador(){
   const {linhas} = await imp.lerPdf({arrayBuffer: async () => buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.length)});
   if(process.env.DEBUG) linhas.forEach(l => console.log("   ", l.origem, JSON.stringify(l.celulas)));
   imp.processarPedido(linhas);
-  const r = res.resultado, got = r.linhas.map(l => [l.opcoes[0] && l.opcoes[0].cod, l.qtd, l.qtdLida]);
+  const r = res.resultado, got = r.linhas.map(l => [l.codTxt, l.qtd, l.qtdLida]);
   console.log("     importador:", r.info, JSON.stringify(got));
   confere(/^Hoja de pedido Kapazi: 3 produto/.test(r.info), "gerador reconhece a Hoja de pedido (marca KZ-PED + cabeçalho)");
   confere(JSON.stringify(got) === JSON.stringify([[c1, 12, true], [c3, 3, true], [c2, 2.5, true]]), "códigos e quantidades exatos (12, 3 e 2,5)");
-  confere(r.linhas.every(l => l.usar), "todos os itens marcados para entrar na proforma");
+  confere(r.linhas.filter(l => l.usar).length === 2 && !r.linhas[2].opcoes.length, "produtos do gerador entram direto; o da tabela ATACADO fica para incluir como item manual");
 
   // catálogo inteiro: várias páginas, cabeçalho repetido não vira item
   await pg.evaluate(() => { dlgRev.close(); CAT.forEach((p, i) => { itens[p.cod] = {qtd: i + 1, obs: ""}; }); });
@@ -117,9 +119,27 @@ function importadorDoGerador(){
   const b2 = fs.readFileSync(arq2), l2 = await imp.lerPdf({arrayBuffer: async () => b2.buffer.slice(b2.byteOffset, b2.byteOffset + b2.length)});
   imp.processarPedido(l2.linhas);
   const r2 = res.resultado, esperado = await pg.evaluate(() => CAT.filter(p => itens[p.cod]).map(p => [p.cod, itens[p.cod].qtd]));
-  const lidos = r2.linhas.map(l => [l.opcoes[0] && l.opcoes[0].cod, l.qtd]);
+  const lidos = r2.linhas.map(l => [l.codTxt, l.qtd]);
   console.log("     pedido grande:", r2.info, "|", lidos.length, "itens");
   confere(JSON.stringify(lidos) === JSON.stringify(esperado), `catálogo inteiro (${esperado.length} itens, várias páginas) importa igual`);
+
+  // português e inglês: tela traduzida e PDF que o gerador também lê
+  for(const [l, titulo] of [["pt", "Folha de Pedido Kapazi"], ["en", "Kapazi Order Sheet"]]){
+    await pg.evaluate(() => { dlgRev.close(); Object.keys(itens).forEach(k => delete itens[k]); });
+    await pg.selectOption("#idioma", l);
+    confere(await pg.textContent("h1") === titulo && await pg.evaluate(() => document.documentElement.lang) === l, `tela em ${l}: "${titulo}"`);
+    const amostra = await pg.evaluate(() => CAT.filter(p => /PRETO|TAPETE DE BANHEIRO|C\/\d/.test(p.pt)).slice(0, 3).map(p => p.pt + "  ->  " + descEm(p)));
+    amostra.forEach(a => console.log(`     ${l}:`, a));
+    await pg.evaluate(([a, b, c]) => { itens[a] = {qtd: 7, obs: ""}; itens[b] = {qtd: 1.5, obs: ""}; itens[c] = {qtd: 40, obs: ""}; resumo(); }, [c1, c3, c2]);
+    await pg.click("#revisar");
+    const [d] = await Promise.all([pg.waitForEvent("download"), pg.click("#pdf")]);
+    const a3 = path.join(require("os").tmpdir(), `pedido_${l}.pdf`); await d.saveAs(a3);
+    const b3 = fs.readFileSync(a3), l3 = await imp.lerPdf({arrayBuffer: async () => b3.buffer.slice(b3.byteOffset, b3.byteOffset + b3.length)});
+    imp.processarPedido(l3.linhas);
+    const g3 = res.resultado.linhas.map(x => [x.codTxt, x.qtd]).sort().join(";"), e3 = [[c1, 7], [c3, 1.5], [c2, 40]].sort().join(";");
+    console.log(`     PDF ${l}:`, d.suggestedFilename(), "|", res.resultado.info);
+    confere(/^Hoja de pedido Kapazi: 3 produto/.test(res.resultado.info) && g3 === e3, `PDF em ${l} importa no gerador com códigos e quantidades exatos`);
+  }
 
   confere(!erros.length, "sem erros na página" + (erros.length ? ": " + erros.join(" | ") : ""));
   await nav.close(); srv.close();
