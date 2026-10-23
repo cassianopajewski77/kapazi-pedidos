@@ -48,7 +48,7 @@ function importadorDoGerador(){
   await ctx.route(/cdn\.jsdelivr\.net\/npm\/jspdf-autotable@/, r => r.fulfill({contentType: "application/javascript", body: fs.readFileSync(path.join(LIBS, "jspdf-autotable/dist/jspdf.plugin.autotable.min.js"))}));
   const pg = await ctx.newPage();
   const erros = []; pg.on("pageerror", e => erros.push(e.message));
-  pg.on("dialog", d => { erros.push("diálogo: " + d.message()); d.accept(); });
+  pg.on("dialog", d => { if(d.type() !== "confirm") erros.push("diálogo: " + d.message()); d.accept(); });
 
   await pg.goto(base + "/?cliente=007700");
   await pg.waitForSelector(".prod");
@@ -94,7 +94,30 @@ function importadorDoGerador(){
   const [dl] = await Promise.all([pg.waitForEvent("download"), pg.click("#pdf")]);
   const arq = path.join(require("os").tmpdir(), "pedido_teste.pdf"); await dl.saveAs(arq);
   console.log("     PDF:", dl.suggestedFilename(), fs.statSync(arq).size, "bytes");
-  confere(/^Pedido Kapazi - Alfombras del Sur S\.A\. - \d{4}-\d\d-\d\d\.pdf$/.test(dl.suggestedFilename()), "nome do PDF tem empresa e data");
+  const num = await pg.evaluate(() => numero);
+  confere(/^OC-AS-\d{6}-\d{4}$/.test(num) && dl.suggestedFilename() === `Pedido Kapazi ${num} - Alfombras del Sur S.A..pdf` && (await pg.textContent("#numeroOC")) === num, `nº da ordem de compra criado (${num}), na tela e no nome do PDF`);
+
+  // pedidos salvos: novo pedido mantém os dados do cliente; abrir pela lista e pelo PDF devolve o pedido
+  const antes = await pg.evaluate(() => JSON.stringify(itens));
+  await pg.evaluate(() => dlgRev.close());
+  await pg.click("#btnPedidos"); await pg.click("#btnNovo");
+  confere(await pg.evaluate(() => !Object.keys(itens).length && !numero) && await pg.inputValue("#d_empresa") === "Alfombras del Sur S.A.", "novo pedido limpa os produtos e mantém os dados do cliente");
+  await pg.reload(); await pg.waitForSelector(".prod");
+  confere(await pg.inputValue("#d_contacto") === "María Núñez", "dados do cliente continuam salvos depois de recarregar");
+  await pg.click("#btnPedidos");
+  confere(await pg.$$eval("#pedTb tr", l => l.length) === 1 && (await pg.textContent("#pedTb")).includes(num), "lista Mis pedidos mostra o pedido salvo");
+  await pg.click('#pedTb button[data-a="abrir"]');
+  confere(await pg.evaluate(() => JSON.stringify(itens)) === antes && await pg.evaluate(() => numero) === num, "abrir pela lista devolve itens e número");
+  await pg.evaluate(() => { itens = {}; numero = ""; LS.set("kz_pedidos_v1", []); resumo(); });
+  await pg.click("#btnPedidos");
+  await pg.setInputFiles("#pedArquivo", arq);
+  await pg.waitForFunction(() => Object.keys(itens).length === 3);
+  confere(await pg.evaluate(() => JSON.stringify(itens)) === antes && await pg.evaluate(() => numero + "|" + document.getElementById("obsGeneral").value) === num + "|Embarque deseado: enero 2027.\nEtiquetas en español.", "abrir o PDF baixado devolve o pedido (itens, número e observações)");
+  // visualizar: prévia do PDF na página
+  await pg.click("#revisar"); await pg.click("#ver");
+  await pg.waitForFunction(() => document.getElementById("dlgVer").open && /^blob:/.test(document.getElementById("verPdf").src));
+  confere(true, "visualizar pedido abre a prévia do PDF");
+  await pg.evaluate(() => { dlgVer.close(); dlgRev.close(); });
   await pg.screenshot({path: path.join(require("os").tmpdir(), "pedido_tela.png"), fullPage: false});
 
   // o importador do gerador lê o PDF

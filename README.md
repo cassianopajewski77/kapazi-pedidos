@@ -8,6 +8,10 @@ Do banco do gerador ele só lê o catálogo, pela função pública `catalogo_pe
 - `site/index.html`: o cliente preenche os dados da empresa, busca produtos por código ou descrição (com foto),
   informa quantidades e baixa o PDF "Hoja de Pedido". O rascunho fica guardado no navegador dele.
   Link com o cliente já preenchido: `/?cliente=<código>&empresa=<nome>`.
+- Cada pedido ganha um **nº de ordem de compra** automático (`OC-<iniciais da empresa>-<AAMMDD>-<HHMM>`), que sai no
+  topo do PDF e no nome do arquivo. "Guardar pedido" e "Mis pedidos" salvam e reabrem pedidos neste navegador; o PDF
+  leva o pedido inteiro no campo Subject (`KZPED1:` + JSON em base64), então "Abrir PDF" o reabre em qualquer computador.
+  Os dados da empresa ficam salvos no navegador para todos os pedidos. "Visualizar pedido" mostra a prévia do PDF.
 - O PDF leva a marca `KZ-PED v1` e o cabeçalho `CÓDIGO / CANTIDAD`: no gerador de proforma, o
   **Importar pedido do cliente** lê os códigos e quantidades direto (só as linhas com cantidad).
 - Catálogo: o site chama `catalogo_pedido()` no Supabase do gerador (`site/config.js`; rode

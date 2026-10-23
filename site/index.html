@@ -54,6 +54,10 @@ mark{background:#ffe49a;padding:0}
 .btn.pri{background:var(--navy);border-color:var(--navy);color:#fff;font-weight:600;padding:11px 20px}
 .btn.pri:disabled{opacity:.5;cursor:default}
 .btn.sec{padding:9px 14px}
+.acoes{display:flex;gap:8px;flex-wrap:wrap}
+#numeroOC{font-family:Consolas,Menlo,monospace;color:var(--navy)}
+.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 16px;border-radius:8px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:9}
+.toast.on{opacity:1}
 table{width:100%;border-collapse:collapse;font-size:14px}
 th,td{border-bottom:1px solid var(--line);padding:7px 6px;text-align:left;vertical-align:middle}
 th{font-size:12px;color:var(--muted);font-weight:600}
@@ -85,6 +89,8 @@ header .lang select{width:auto;padding:5px 8px;font-size:13px;border-radius:6px;
   header{gap:10px}
   header img{height:30px}
   header .sub,header .lang span{display:none}
+  main{padding-bottom:190px}
+  .barra .btn{padding:8px 12px;font-size:14px}
 }
 </style>
 </head>
@@ -117,9 +123,25 @@ header .lang select{width:auto;padding:5px 8px;font-size:13px;border-radius:6px;
 </main>
 
 <div class="barra"><div>
-  <span id="resumen"></span>
-  <button class="btn pri" id="revisar" type="button" disabled data-t="revisar"></button>
+  <span><span id="resumen"></span><br><span class="det"><span data-t="numero"></span>: <b id="numeroOC"></b></span></span>
+  <span class="acoes">
+    <button class="btn sec" id="btnPedidos" type="button" data-t="misPedidos"></button>
+    <button class="btn sec" id="btnGuardar" type="button" data-t="guardarBtn"></button>
+    <button class="btn pri" id="revisar" type="button" disabled data-t="revisar"></button>
+  </span>
 </div></div>
+
+<dialog id="dlgPed">
+  <div class="dh"><span data-t="pedTitulo"></span> <button class="btn sec" type="button" onclick="dlgPed.close()">✕</button></div>
+  <div class="db">
+    <p class="ayuda" data-t="pedAyuda"></p>
+    <table><tbody id="pedTb"></tbody></table>
+  </div>
+  <div class="df">
+    <label class="btn sec" style="margin:0;font-size:15px;color:inherit;cursor:pointer"><span data-t="abrirPdf"></span><input type="file" id="pedArquivo" accept=".pdf,application/pdf" hidden></label>
+    <button class="btn pri" id="btnNovo" type="button" data-t="nuevoPed"></button>
+  </div>
+</dialog>
 
 <dialog id="dlgRev">
   <div class="dh"><span data-t="revTitulo"></span> <button class="btn sec" type="button" onclick="dlgRev.close()">✕</button></div>
@@ -131,8 +153,15 @@ header .lang select{width:auto;padding:5px 8px;font-size:13px;border-radius:6px;
   </div>
   <div class="df">
     <button class="btn sec" type="button" onclick="dlgRev.close()" data-t="seguir"></button>
+    <button class="btn sec" id="ver" type="button" data-t="visualizar"></button>
     <button class="btn pri" id="pdf" type="button" data-t="descargar"></button>
   </div>
+</dialog>
+
+<dialog id="dlgVer" style="max-width:min(1000px,96vw)">
+  <div class="dh"><span data-t="visualizar"></span> <button class="btn sec" type="button" onclick="dlgVer.close()">✕</button></div>
+  <iframe id="verPdf" title="PDF" style="display:block;width:100%;height:72vh;border:0;background:#525659"></iframe>
+  <div class="df"><button class="btn sec" type="button" onclick="dlgVer.close()" data-t="cerrar"></button><button class="btn pri" type="button" id="verBaixar" data-t="descargar"></button></div>
 </dialog>
 
 <dialog id="zoom"><div class="dh"><span id="zoomT"></span><button class="btn sec" type="button" onclick="zoom.close()">✕</button></div><div class="db"><img id="zoomI" alt=""><div class="miniaturas" id="zoomM"></div></div></dialog>
@@ -161,7 +190,7 @@ const lerNum = s => { const n = parseFloat(String(s || "").replace(/\s/g, "").re
 
 let CAT = [], porCod = new Map(), filtro = "", soloSel = false, categoria = "", mostrar = 40;
 const salvo = LS.get("kz_pedido_v1", {});
-const datos = Object.assign({}, salvo.datos || {});
+const datos = Object.assign({}, LS.get("kz_cliente_v1", {}), salvo.datos || {});   // dados da empresa ficam guardados para todos os pedidos
 let itens = salvo.itens || {};   // cod -> {qtd, obs}
 const params = new URLSearchParams(location.search);
 if(params.get("cliente")) datos.codCliente = params.get("cliente");
@@ -169,7 +198,8 @@ if(params.get("empresa")) datos.empresa = params.get("empresa");
 const navegador = (navigator.language || "").slice(0, 2);
 let idioma = IDIOMAS[params.get("lang")] ? params.get("lang") : IDIOMAS[salvo.idioma] ? salvo.idioma : navegador === "pt" ? "pt" : navegador === "en" ? "en" : "es";
 const T = () => TXT[idioma];
-const guardar = () => LS.set("kz_pedido_v1", {datos, itens, idioma, obs: document.getElementById("obsGeneral").value});
+let numero = salvo.numero || "";   // nº da ordem de compra, criado ao salvar ou gerar o PDF
+const guardar = () => { LS.set("kz_pedido_v1", {datos, itens, idioma, numero, obs: document.getElementById("obsGeneral").value}); LS.set("kz_cliente_v1", datos); };
 
 /* ---------- idioma ---------- */
 const descEm = (p, l = idioma) => l === "pt" ? p.pt : l === "es" ? p.es : (p.en || (p.en = traduzirEN(p.pt)));
@@ -180,7 +210,8 @@ function aplicarIdioma(){
   document.getElementById("q").placeholder = t.buscar;
   document.getElementById("obsGeneral").placeholder = t.obsGenPh;
   CAMPOS.forEach(([k, obr]) => { document.querySelector(`label[for="d_${k}"]`).innerHTML = esc(t.campos[k]) + (obr ? " <b>*</b>" : ""); });
-  if(CAT.length){ montarCategorias(); desenhar(false); if(dlgRev.open) desenharRevisao(); }
+  if(typeof mostrarNumero === "function" && document.getElementById("numeroOC")) mostrarNumero();
+  if(CAT.length){ montarCategorias(); desenhar(false); if(dlgRev.open) desenharRevisao(); if(dlgPed.open) desenharPedidos(); }
 }
 document.getElementById("idioma").innerHTML = Object.entries(IDIOMAS).map(([k, n]) => `<option value="${k}">${n}</option>`).join("");
 document.getElementById("idioma").value = idioma;
@@ -329,7 +360,7 @@ function desenharRevisao(){
     <td><button class="x" type="button" title="${esc(t.quitar)}">✕</button></td></tr>`).join("") || `<tr><td colspan="6" class="vacio">${esc(t.ningunoSel)}</td></tr>`;
   const f = faltando();
   document.getElementById("revFaltan").innerHTML = f.length ? `<div style="background:#fff8dc;border:1px solid #ecd98b;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:14px">${esc(t.completar)} <b>${f.map(x => esc(x.rot)).join(", ")}</b>.</div>` : "";
-  document.getElementById("pdf").disabled = !sel.length;
+  document.getElementById("pdf").disabled = document.getElementById("ver").disabled = !sel.length;
 }
 document.getElementById("revisar").addEventListener("click", () => { document.getElementById("revOk").style.display = "none"; desenharRevisao(); dlgRev.showModal(); });
 document.getElementById("revTb").addEventListener("input", e => {
@@ -344,6 +375,68 @@ document.getElementById("revTb").addEventListener("click", e => {
 });
 dlgRev.addEventListener("close", () => desenhar(false));
 
+/* ---------- ordem de compra: número, salvar e abrir pedidos ---------- */
+// OC-<iniciais da empresa>-<AAMMDD>-<HHMM>: legível para o cliente e para a Kapazi, sem precisar de servidor
+function criarNumero(){
+  const ini = (norm(datos.empresa || "").replace(/[^A-Z0-9 ]/g, " ").split(/\s+/).filter(w => w && !/^(SA|S|A|LTDA|LTD|SRL|SAS|CV|SACV|INC|LLC|DE|DEL|LA|EL|Y|E)$/.test(w)).map(w => w[0]).join("").slice(0, 3)) || "CLI";
+  const d = new Date(), z = n => String(n).padStart(2, "0");
+  return `OC-${ini}-${String(d.getFullYear()).slice(2)}${z(d.getMonth() + 1)}${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}`;
+}
+const pedidosSalvos = () => LS.get("kz_pedidos_v1", []);
+function mostrarNumero(){ document.getElementById("numeroOC").textContent = numero || T().nuevoNum; }
+function toast(msg){ let t = document.querySelector(".toast"); if(!t){ t = document.createElement("div"); t.className = "toast"; document.body.appendChild(t); } t.textContent = msg; t.classList.add("on"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("on"), 2800); }
+function pedidoAtual(){ return {numero, data: new Date().toISOString(), idioma, datos: {...datos}, itens: JSON.parse(JSON.stringify(itens)), obs: document.getElementById("obsGeneral").value}; }
+function salvarPedido(avisar){
+  if(!Object.keys(itens).length) return null;
+  if(!numero) numero = criarNumero();
+  const p = pedidoAtual(), l = pedidosSalvos().filter(x => x.numero !== numero);
+  l.unshift(p); LS.set("kz_pedidos_v1", l.slice(0, 100));
+  guardar(); mostrarNumero();
+  if(avisar) toast(T().guardado(numero));
+  return p;
+}
+function carregarPedido(p){
+  Object.keys(datos).forEach(k => delete datos[k]); Object.assign(datos, p.datos || {});
+  itens = {}; Object.entries(p.itens || {}).forEach(([cod, it]) => { if(porCod.has(cod)) itens[cod] = it; });
+  numero = p.numero || ""; document.getElementById("obsGeneral").value = p.obs || "";
+  CAMPOS.forEach(([k]) => { const el = document.getElementById("d_" + k); el.value = datos[k] || ""; el.classList.remove("falta"); });
+  if(p.idioma && IDIOMAS[p.idioma] && p.idioma !== idioma){ idioma = p.idioma; document.getElementById("idioma").value = idioma; aplicarIdioma(); }
+  guardar(); mostrarNumero(); soloSel = true; desenhar(true);
+}
+function desenharPedidos(){
+  const t = T(), l = pedidosSalvos();
+  document.getElementById("pedTb").innerHTML = l.length ? l.map((p, i) => `<tr>
+    <td class="cod">${esc(p.numero)}</td><td>${esc((p.datos && p.datos.empresa) || "")}<div class="det">${esc(new Date(p.data).toLocaleString(idioma))} · ${esc(t.productos_n(Object.keys(p.itens || {}).length))}</div></td>
+    <td style="white-space:nowrap;text-align:right"><button class="btn sec" type="button" data-a="abrir" data-i="${i}">${esc(t.abrir)}</button> <button class="x" type="button" data-a="borrar" data-i="${i}" title="${esc(t.borrar)}">✕</button></td></tr>`).join("")
+    : `<tr><td class="vacio">${esc(t.pedVacio)}</td></tr>`;
+}
+const dlgPed = document.getElementById("dlgPed");
+document.getElementById("btnGuardar").addEventListener("click", () => salvarPedido(true));
+document.getElementById("btnPedidos").addEventListener("click", () => { desenharPedidos(); dlgPed.showModal(); });
+document.getElementById("pedTb").addEventListener("click", e => {
+  const b = e.target.closest("button[data-a]"); if(!b) return;
+  const l = pedidosSalvos(), p = l[+b.dataset.i]; if(!p) return;
+  if(b.dataset.a === "abrir"){ if(Object.keys(itens).length && p.numero !== numero && !confirm(T().confAbrir)) return; carregarPedido(p); dlgPed.close(); }
+  else if(confirm(T().confBorrar(p.numero))){ l.splice(+b.dataset.i, 1); LS.set("kz_pedidos_v1", l); desenharPedidos(); }
+});
+document.getElementById("btnNovo").addEventListener("click", () => {
+  if(Object.keys(itens).length && !confirm(T().confNuevo)) return;
+  itens = {}; numero = ""; document.getElementById("obsGeneral").value = ""; soloSel = false; guardar(); mostrarNumero(); dlgPed.close(); desenhar(true);
+});
+// o PDF gerado aqui leva o pedido inteiro (JSON em base64) no campo "Subject"; abrir o PDF devolve o pedido
+const paraB64 = o => btoa(unescape(encodeURIComponent(JSON.stringify(o))));
+const deB64 = s => JSON.parse(decodeURIComponent(escape(atob(s))));
+document.getElementById("pedArquivo").addEventListener("change", async e => {
+  const f = e.target.files[0]; e.target.value = ""; if(!f) return;
+  const txt = new TextDecoder("latin1").decode(await f.arrayBuffer()), m = txt.match(/KZPED1:([A-Za-z0-9+\/=]+)/);
+  let p = null; try{ p = m && deB64(m[1]); }catch(err){}
+  if(!p || !p.itens){ alert(T().pdfInvalido); return; }
+  if(Object.keys(itens).length && p.numero !== numero && !confirm(T().confAbrir)) return;
+  carregarPedido(p);
+  const l = pedidosSalvos().filter(x => x.numero !== p.numero); l.unshift(p); LS.set("kz_pedidos_v1", l.slice(0, 100));
+  dlgPed.close();
+});
+
 /* ---------- PDF ---------- */
 function carregarScript(src){
   return new Promise((ok, erro) => { if(document.querySelector(`script[src="${src}"]`)) return ok();
@@ -355,7 +448,7 @@ function logoJpeg(src){ return new Promise(ok => { const i = new Image(); i.onlo
   const k = Math.min(1, 500 / i.naturalWidth), c = document.createElement("canvas"); c.width = Math.round(i.naturalWidth * k); c.height = Math.round(i.naturalHeight * k);
   const g = c.getContext("2d"); g.fillStyle = "#041243"; g.fillRect(0, 0, c.width, c.height); g.drawImage(i, 0, 0, c.width, c.height);
   ok({src: c.toDataURL("image/jpeg", .9), w: c.width, h: c.height}); }; i.onerror = () => ok(null); i.src = src; }); }
-async function gerarPdf(){
+async function gerarPdf(modo){
   const f = faltando(), t = T(), tp = t.pdf;
   if(f.length){
     dlgRev.close(); f.forEach(x => document.getElementById("d_" + x.k).classList.add("falta"));
@@ -363,16 +456,19 @@ async function gerarPdf(){
     return;
   }
   const sel = selecionados(); if(!sel.length) return;
-  const btn = document.getElementById("pdf"); btn.disabled = true; btn.textContent = t.generando;
+  const btn = document.getElementById(modo === "ver" ? "ver" : "pdf"), rotulo = btn.textContent; btn.disabled = true; btn.textContent = t.generando;
   try{
+    const ped = salvarPedido(false);   // gerar o PDF também salva o pedido (e cria o nº da OC)
     await carregarScript(URL_JSPDF); await carregarScript(URL_AUTOTABLE);
     const {jsPDF} = window.jspdf, doc = new jsPDF({unit: "mm", format: "a4", compress: true});
+    doc.setProperties({title: `${tp.titulo} ${numero}`, subject: "KZPED1:" + paraB64(ped), author: datos.empresa || "", creator: "Kapazi Pedidos"});
     const W = 210, M = 12, NAVY = [4, 18, 67], CORAL = [241, 106, 100], fecha = hojeISO().split("-").reverse().join("/");
     // faixa do topo: logo, título e a marca KZ-PED (o gerador reconhece a hoja de pedido por ela)
     doc.setFillColor(...NAVY); doc.rect(0, 0, W, 24, "F");
     if(window.LOGO_KAPAZI){ const d = await logoJpeg(window.LOGO_KAPAZI); if(d){ const h = 16, w = Math.min(50, h * d.w / d.h); doc.addImage(d.src, "JPEG", M, 4, w, h); } }
     doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.setFontSize(16); doc.text(tp.titulo, W - M, 12, {align: "right"});
-    doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.text(`${MARCA}   ${tp.fecha} ${fecha}`, W - M, 18, {align: "right"});
+    doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.text(`${t.numero}: ${numero}`, W - M, 17.5, {align: "right"});
+    doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.text(`${MARCA}   ${tp.fecha} ${fecha}`, W - M, 21.5, {align: "right"});
     // dados do cliente em duas colunas (rótulo e valor separados)
     doc.setTextColor(30, 32, 48);
     const pares = CAMPOS.filter(([k]) => datos[k]).map(([k]) => [t.campos[k].replace(/\s*\(.*\)$/, ""), datos[k]]);
@@ -420,16 +516,25 @@ async function gerarPdf(){
       doc.text(tp.pie(sel.length, CONTATO), M, 290);
       doc.text(tp.pag(i, n), W - M, 290, {align: "right"});
     }
-    const nome = `${tp.archivo} - ${(datos.empresa || "cliente").replace(/[\\/:*?"<>|]/g, "-").slice(0, 60)} - ${hojeISO()}.pdf`;
+    const nome = `${tp.archivo} ${numero} - ${(datos.empresa || "cliente").replace(/[\\/:*?"<>|]/g, "-").slice(0, 60)}.pdf`;
+    if(modo === "ver"){   // prévia na própria página, antes de baixar
+      const dv = document.getElementById("dlgVer"), fr = document.getElementById("verPdf");
+      if(fr.dataset.url) URL.revokeObjectURL(fr.dataset.url);
+      fr.dataset.url = URL.createObjectURL(doc.output("blob")); fr.src = fr.dataset.url;
+      dv.showModal(); return;
+    }
     doc.save(nome);
     const ok = document.getElementById("revOk"); ok.style.display = "";
-    ok.innerHTML = t.listo(esc(nome), CONTATO, `mailto:${CONTATO}?subject=${encodeURIComponent(tp.asunto + " " + (datos.empresa || "") + (datos.oc ? " – " + datos.oc : ""))}`);
+    ok.innerHTML = t.listo(esc(nome), CONTATO, `mailto:${CONTATO}?subject=${encodeURIComponent(tp.asunto + " " + numero + " – " + (datos.empresa || "") + (datos.oc ? " – " + datos.oc : ""))}`);
   }catch(e){ alert(t.errorPdf + (e && e.message || e)); }
-  finally{ btn.disabled = false; btn.textContent = t.descargar; }
+  finally{ btn.disabled = false; btn.textContent = rotulo; }
 }
-document.getElementById("pdf").addEventListener("click", gerarPdf);
+const dlgVer = document.getElementById("dlgVer");
+document.getElementById("pdf").addEventListener("click", () => gerarPdf("baixar"));
+document.getElementById("ver").addEventListener("click", () => gerarPdf("ver"));
+document.getElementById("verBaixar").addEventListener("click", () => { dlgVer.close(); gerarPdf("baixar"); });
 
-aplicarIdioma(); resumo();
+aplicarIdioma(); resumo(); mostrarNumero();
 carregarCatalogo().then(l => { prepararCatalogo(l); desenhar(true); })
   .catch(e => { aviso(esc(T().errorCat) + ` <a href="mailto:${CONTATO}">${CONTATO}</a>.`); document.getElementById("lista").innerHTML = ""; console.error(e); });
 </script>
