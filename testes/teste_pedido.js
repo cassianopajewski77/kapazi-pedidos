@@ -93,9 +93,11 @@ function importadorDoGerador(){
   await pg.click("#revisar"); await pg.click("#pdf");
   confere(await pg.$$eval(".falta", l => l.map(e => e.id).join()) === "d_incoterm", "faltando só o Incoterm, ainda não gera o PDF");
   await pg.selectOption("#d_incoterm", "CIF");
-  // recarregar mantém o rascunho
+  // recarregar: os itens voltam, "Sus datos" abre em branco e o botão recupera os dados guardados
   await pg.reload(); await pg.waitForSelector(".prod");
-  confere(/3 producto/.test(await pg.textContent("#resumen")) && await pg.inputValue("#d_empresa") === "Alfombras del Sur S.A.", "rascunho (dados + itens) volta depois de recarregar");
+  confere(/3 producto/.test(await pg.textContent("#resumen")) && await pg.inputValue("#d_empresa") === "" && await pg.isVisible("#usarDatos"), "ao abrir, os itens voltam e Sus datos está em branco (com o botão Usar mis datos guardados)");
+  await pg.click("#usarDatos");
+  confere(await pg.inputValue("#d_empresa") === "Alfombras del Sur S.A." && await pg.inputValue("#d_incoterm") === "CIF", "Usar mis datos guardados preenche todos os campos");
 
   await pg.click("#revisar");
   await pg.fill(`#revTb tr[data-cod="${c3}"] input[data-f="obs"]`, "verde oscuro");
@@ -112,7 +114,9 @@ function importadorDoGerador(){
   await pg.click("#btnPedidos"); await pg.click("#btnNovo");
   confere(await pg.evaluate(() => !Object.keys(itens).length && !numero) && await pg.inputValue("#d_empresa") === "Alfombras del Sur S.A.", "novo pedido limpa os produtos e mantém os dados do cliente");
   await pg.reload(); await pg.waitForSelector(".prod");
-  confere(await pg.inputValue("#d_contacto") === "María Núñez", "dados do cliente continuam salvos depois de recarregar");
+  confere(await pg.inputValue("#d_contacto") === "", "recarregar abre Sus datos em branco");
+  await pg.click("#usarDatos");
+  confere(await pg.inputValue("#d_contacto") === "María Núñez", "dados do cliente continuam guardados e voltam pelo botão");
   await pg.click("#btnPedidos");
   confere(await pg.$$eval("#pedTb tr", l => l.length) === 1 && (await pg.textContent("#pedTb")).includes(num), "lista Mis pedidos mostra o pedido salvo");
   await pg.click('#pedTb button[data-a="abrir"]');

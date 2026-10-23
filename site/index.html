@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Hoja de Pedido Kapazi</title>
 <link rel="icon" href="favicon.png">
-<script src="config.js?v=20261023d"></script>
-<script src="logo.js?v=20261023d"></script>
-<script src="traducao.js?v=20261023d"></script>
-<script src="idiomas.js?v=20261023d"></script>
+<script src="config.js?v=20261023e"></script>
+<script src="logo.js?v=20261023e"></script>
+<script src="traducao.js?v=20261023e"></script>
+<script src="idiomas.js?v=20261023e"></script>
 <style>
 :root{--navy:#041243;--coral:#F16A64;--line:#d9dbe2;--muted:#6b7080;--bg:#f5f6f8;--card:#fff;--ok:#1e6b38;--sel:#eef3fb;--warn:#fff8dc}
 *{box-sizing:border-box}
@@ -112,6 +112,7 @@ header .lang select{width:auto;padding:5px 8px;font-size:13px;border-radius:6px;
   <section class="card">
     <h2 data-t="datos"></h2>
     <p class="ayuda" data-t="datosAyuda"></p>
+    <p id="usarDatosBox" style="display:none;margin:0 0 14px"><button class="btn sec" id="usarDatos" type="button" data-t="usarDatos"></button></p>
     <div class="grid" id="datos"></div>
   </section>
 
@@ -198,7 +199,7 @@ const lerNum = s => { const n = parseFloat(String(s || "").replace(/\s/g, "").re
 
 let CAT = [], porCod = new Map(), filtro = "", soloSel = false, categoria = "", mostrar = 40;
 const salvo = LS.get("kz_pedido_v1", {});
-const datos = Object.assign({}, LS.get("kz_cliente_v1", {}), salvo.datos || {});   // dados da empresa ficam guardados para todos os pedidos
+const datos = {};   // a página sempre abre com "Sus datos" em branco; os dados completos ficam guardados (kz_cliente_v1) e voltam pelo botão "Usar mis datos guardados"
 let itens = salvo.itens || {};   // cod -> {qtd, obs}
 const params = new URLSearchParams(location.search);
 if(params.get("cliente")) datos.codCliente = params.get("cliente");
@@ -207,7 +208,8 @@ const navegador = (navigator.language || "").slice(0, 2);
 let idioma = IDIOMAS[params.get("lang")] ? params.get("lang") : IDIOMAS[salvo.idioma] ? salvo.idioma : navegador === "pt" ? "pt" : navegador === "en" ? "en" : "es";
 const T = () => TXT[idioma];
 let numero = salvo.numero || "";   // nº da ordem de compra, criado ao salvar ou gerar o PDF
-const guardar = () => { LS.set("kz_pedido_v1", {datos, itens, idioma, numero, obs: document.getElementById("obsGeneral").value}); LS.set("kz_cliente_v1", datos); };
+const completos = () => CAMPOS.every(([k, obr]) => !obr || datos[k]);
+const guardar = () => { LS.set("kz_pedido_v1", {itens, idioma, numero, obs: document.getElementById("obsGeneral").value}); if(completos()) LS.set("kz_cliente_v1", Object.assign({}, datos)); };
 
 /* ---------- idioma ---------- */
 const descEm = (p, l = idioma) => l === "pt" ? p.pt : l === "es" ? p.es : (p.en || (p.en = traduzirEN(p.pt)));
@@ -230,6 +232,13 @@ document.getElementById("datos").innerHTML = CAMPOS.map(([k, obr, tipo, ops]) =>
   tipo === "select" ? `<select id="d_${k}">${ops.map(o => `<option value="${o}">${o || "—"}</option>`).join("")}</select>`
   : `<input id="d_${k}" type="${tipo || "text"}" autocomplete="${{empresa:"organization", email:"email", telefono:"tel", contacto:"name", pais:"country-name", ciudad:"address-level2", direccion:"street-address"}[k] || "off"}">`}</div>`).join("");
 CAMPOS.forEach(([k]) => { const el = document.getElementById("d_" + k); el.value = datos[k] || ""; el.addEventListener("input", () => { datos[k] = el.value.trim(); el.classList.remove("falta"); guardar(); }); });
+const mostrarDados = () => CAMPOS.forEach(([k]) => { const el = document.getElementById("d_" + k); el.value = datos[k] || ""; el.classList.remove("falta"); });
+document.getElementById("usarDatosBox").style.display = LS.get("kz_cliente_v1", {}).empresa ? "" : "none";
+document.getElementById("usarDatos").addEventListener("click", () => {
+  const g = LS.get("kz_cliente_v1", {});
+  CAMPOS.forEach(([k]) => { if(g[k] && !datos[k]) datos[k] = g[k]; });   // só completa o que está em branco (mantém ?cliente= e o que já foi digitado)
+  mostrarDados(); guardar();
+});
 document.getElementById("obsGeneral").value = salvo.obs || "";
 document.getElementById("obsGeneral").addEventListener("input", guardar);
 if(window.LOGO_KAPAZI) document.getElementById("logo").src = window.LOGO_KAPAZI; else document.getElementById("logo").remove();
@@ -420,7 +429,7 @@ function carregarPedido(p){
   Object.keys(datos).forEach(k => delete datos[k]); Object.assign(datos, p.datos || {});
   itens = {}; Object.entries(p.itens || {}).forEach(([cod, it]) => { if(porCod.has(cod)) itens[cod] = it; });
   numero = p.numero || ""; document.getElementById("obsGeneral").value = p.obs || "";
-  CAMPOS.forEach(([k]) => { const el = document.getElementById("d_" + k); el.value = datos[k] || ""; el.classList.remove("falta"); });
+  mostrarDados();
   if(p.idioma && IDIOMAS[p.idioma] && p.idioma !== idioma){ idioma = p.idioma; document.getElementById("idioma").value = idioma; aplicarIdioma(); }
   guardar(); mostrarNumero(); soloSel = true; desenhar(true);
 }
