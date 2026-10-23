@@ -86,9 +86,13 @@ function importadorDoGerador(){
 
   // sem os dados obrigatórios não baixa: marca os campos
   await pg.click("#revisar"); await pg.click("#pdf");
-  confere(await pg.$$eval(".falta", l => l.length) === 4, "sem dados obrigatórios marca 4 campos e não gera PDF");
+  confere(await pg.$$eval(".falta", l => l.length) === 11, "todos os campos são obrigatórios: marca os 11 vazios e não gera PDF");
   await pg.fill("#d_empresa", "Alfombras del Sur S.A."); await pg.fill("#d_pais", "Chile"); await pg.fill("#d_contacto", "María Núñez");
-  await pg.fill("#d_email", "compras@alfombrasdelsur.cl"); await pg.fill("#d_oc", "OC-2026/118"); await pg.selectOption("#d_incoterm", "CIF");
+  await pg.fill("#d_email", "compras@alfombrasdelsur.cl"); await pg.fill("#d_oc", "OC-2026/118");
+  await pg.fill("#d_docFiscal", "76.123.456-7"); await pg.fill("#d_ciudad", "Santiago"); await pg.fill("#d_direccion", "Av. Providencia 1234"); await pg.fill("#d_telefono", "+56 9 1234 5678"); await pg.fill("#d_destino", "San Antonio");
+  await pg.click("#revisar"); await pg.click("#pdf");
+  confere(await pg.$$eval(".falta", l => l.map(e => e.id).join()) === "d_incoterm", "faltando só o Incoterm, ainda não gera o PDF");
+  await pg.selectOption("#d_incoterm", "CIF");
   // recarregar mantém o rascunho
   await pg.reload(); await pg.waitForSelector(".prod");
   confere(/3 producto/.test(await pg.textContent("#resumen")) && await pg.inputValue("#d_empresa") === "Alfombras del Sur S.A.", "rascunho (dados + itens) volta depois de recarregar");

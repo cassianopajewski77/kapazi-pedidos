@@ -183,8 +183,9 @@ const URL_JSPDF = "https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.j
 const URL_AUTOTABLE = "https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js";
 const CONTATO = "cassiano.pajewski@kapazi.com.br";
 const MARCA = "KZ-PED v1";
-const CAMPOS = [["empresa", true], ["codCliente"], ["docFiscal"], ["pais", true], ["ciudad"], ["direccion"], ["contacto", true], ["email", true, "email"],
-  ["telefono"], ["oc"], ["incoterm", false, "select", ["", "FOB", "CFR", "CIF", "EXW", "FCA", "CPT", "CIP", "DAP", "DDP"]], ["destino"]];
+// todos os campos são obrigatórios
+const CAMPOS = [["empresa", true], ["codCliente", true], ["docFiscal", true], ["pais", true], ["ciudad", true], ["direccion", true], ["contacto", true], ["email", true, "email"],
+  ["telefono", true], ["oc", true], ["incoterm", true, "select", ["", "FOB", "CFR", "CIF", "EXW", "FCA", "CPT", "CIP", "DAP", "DDP"]], ["destino", true]];
 const LS = {
   get(k, d){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch(e){ return d; } },
   set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
