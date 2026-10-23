@@ -7,3 +7,7 @@
 /*
   X-Frame-Options: DENY
   Referrer-Policy: same-origin
+/*.js
+  Cache-Control: no-cache
+/*.json
+  Cache-Control: no-cache
