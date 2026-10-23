@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Hoja de Pedido Kapazi</title>
 <link rel="icon" href="favicon.png">
-<script src="config.js?v=20261023c"></script>
-<script src="logo.js?v=20261023c"></script>
-<script src="traducao.js?v=20261023c"></script>
-<script src="idiomas.js?v=20261023c"></script>
+<script src="config.js?v=20261023d"></script>
+<script src="logo.js?v=20261023d"></script>
+<script src="traducao.js?v=20261023d"></script>
+<script src="idiomas.js?v=20261023d"></script>
 <style>
 :root{--navy:#041243;--coral:#F16A64;--line:#d9dbe2;--muted:#6b7080;--bg:#f5f6f8;--card:#fff;--ok:#1e6b38;--sel:#eef3fb;--warn:#fff8dc}
 *{box-sizing:border-box}
@@ -160,6 +160,7 @@ header .lang select{width:auto;padding:5px 8px;font-size:13px;border-radius:6px;
   <div class="df">
     <button class="btn sec" type="button" onclick="dlgRev.close()" data-t="seguir"></button>
     <button class="btn sec" id="ver" type="button" data-t="visualizar"></button>
+    <button class="btn sec" id="imprimir" type="button" data-t="imprimir"></button>
     <button class="btn pri" id="pdf" type="button" data-t="descargar"></button>
   </div>
 </dialog>
@@ -167,7 +168,7 @@ header .lang select{width:auto;padding:5px 8px;font-size:13px;border-radius:6px;
 <dialog id="dlgVer" style="max-width:min(1000px,96vw)">
   <div class="dh"><span data-t="visualizar"></span> <button class="btn sec" type="button" onclick="dlgVer.close()">✕</button></div>
   <iframe id="verPdf" title="PDF" style="display:block;width:100%;height:72vh;border:0;background:#525659"></iframe>
-  <div class="df"><button class="btn sec" type="button" onclick="dlgVer.close()" data-t="cerrar"></button><button class="btn pri" type="button" id="verBaixar" data-t="descargar"></button></div>
+  <div class="df"><button class="btn sec" type="button" onclick="dlgVer.close()" data-t="cerrar"></button><button class="btn sec" type="button" id="verImprimir" data-t="imprimir"></button><button class="btn pri" type="button" id="verBaixar" data-t="descargar"></button></div>
 </dialog>
 
 <dialog id="zoom"><div class="dh"><span id="zoomT"></span><button class="btn sec" type="button" onclick="zoom.close()">✕</button></div><div class="db"><img id="zoomI" alt=""><div class="miniaturas" id="zoomM"></div></div></dialog>
@@ -476,7 +477,7 @@ async function gerarPdf(modo){
     return;
   }
   const sel = selecionados(); if(!sel.length) return;
-  const btn = document.getElementById(modo === "ver" ? "ver" : "pdf"), rotulo = btn.textContent; btn.disabled = true; btn.textContent = t.generando;
+  const btn = document.getElementById(modo === "baixar" ? "pdf" : modo), rotulo = btn.textContent; btn.disabled = true; btn.textContent = t.generando;
   try{
     const ped = salvarPedido(false);   // gerar o PDF também salva o pedido (e cria o nº da OC)
     await carregarScript(URL_JSPDF); await carregarScript(URL_AUTOTABLE);
@@ -543,15 +544,28 @@ async function gerarPdf(modo){
       fr.dataset.url = URL.createObjectURL(doc.output("blob")); fr.src = fr.dataset.url;
       dv.showModal(); return;
     }
+    if(modo === "imprimir"){   // abre a janela de impressão do navegador com o PDF (iframe escondido)
+      imprimirBlob(doc.output("blob")); return;
+    }
     doc.save(nome);
     const ok = document.getElementById("revOk"); ok.style.display = "";
     ok.innerHTML = t.listo(esc(nome), CONTATO, `mailto:${CONTATO}?subject=${encodeURIComponent(tp.asunto + " " + numero + " – " + (datos.empresa || "") + (datos.oc ? " – " + datos.oc : ""))}`);
   }catch(e){ alert(t.errorPdf + (e && e.message || e)); }
   finally{ btn.disabled = false; btn.textContent = rotulo; }
 }
+function imprimirBlob(blob){
+  let fr = document.getElementById("printPdf");
+  if(!fr){ fr = document.createElement("iframe"); fr.id = "printPdf"; fr.title = "print"; fr.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0"; document.body.appendChild(fr); }
+  if(fr.dataset.url) URL.revokeObjectURL(fr.dataset.url);
+  fr.dataset.url = URL.createObjectURL(blob);
+  fr.onload = () => { try{ fr.contentWindow.focus(); fr.contentWindow.print(); }catch(e){ window.open(fr.dataset.url, "_blank"); } };
+  fr.src = fr.dataset.url;
+}
 const dlgVer = document.getElementById("dlgVer");
 document.getElementById("pdf").addEventListener("click", () => gerarPdf("baixar"));
 document.getElementById("ver").addEventListener("click", () => gerarPdf("ver"));
+document.getElementById("imprimir").addEventListener("click", () => gerarPdf("imprimir"));
+document.getElementById("verImprimir").addEventListener("click", () => { const fr = document.getElementById("verPdf"); try{ fr.contentWindow.focus(); fr.contentWindow.print(); }catch(e){ window.open(fr.dataset.url, "_blank"); } });
 document.getElementById("verBaixar").addEventListener("click", () => { dlgVer.close(); gerarPdf("baixar"); });
 
 aplicarIdioma(); resumo(); mostrarNumero();

@@ -126,6 +126,12 @@ function importadorDoGerador(){
   await pg.click("#revisar"); await pg.click("#ver");
   await pg.waitForFunction(() => document.getElementById("dlgVer").open && /^blob:/.test(document.getElementById("verPdf").src));
   confere(true, "visualizar pedido abre a prévia do PDF");
+  // imprimir: o PDF vai para um iframe escondido e chama print() 
+  await pg.evaluate(() => dlgVer.close());
+  await pg.click("#imprimir");
+  await pg.waitForFunction(() => { const f = document.getElementById("printPdf"); return f && /^blob:/.test(f.src); });
+  await pg.waitForTimeout(500);
+  confere(await pg.evaluate(() => !!document.getElementById("printPdf") && document.getElementById("imprimir").textContent === "Imprimir PDF" && document.getElementById("verImprimir").textContent === "Imprimir PDF"), "botão Imprimir PDF gera o PDF e abre a impressão (também dentro da prévia)");
   await pg.evaluate(() => { dlgVer.close(); dlgRev.close(); });
   await pg.screenshot({path: path.join(require("os").tmpdir(), "pedido_tela.png"), fullPage: false});
 
