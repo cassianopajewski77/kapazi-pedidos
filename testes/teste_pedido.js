@@ -70,13 +70,18 @@ function importadorDoGerador(){
   await pg.fill("#q", c1); await pg.waitForTimeout(300);
   confere(await pg.$eval(".prod .cod", e => e.textContent) === c1, `buscar o código ${c1} traz o produto primeiro`);
   await pg.fill(`.prod[data-cod="${c1}"] input`, "12");
+  confere(await pg.isVisible(`.prod[data-cod="${c1}"] .conf`) && await pg.evaluate(c => !itens[c], c1), "quantidade digitada mostra Confirmar producto e ainda não entra no pedido");
+  await pg.click(`.prod[data-cod="${c1}"] .conf`);
+  confere(await pg.evaluate(c => itens[c] && itens[c].qtd === 12, c1) && !(await pg.isVisible(`.prod[data-cod="${c1}"] .conf`)) && await pg.isVisible(`.prod[data-cod="${c1}"] .noped`), "confirmar inclui o produto e mostra En el pedido");
   await pg.fill("#q", "cesped"); await pg.waitForTimeout(300);
   const ces = await pg.$$eval(".prod", l => l.map(e => e.dataset.cod + " " + e.querySelector(".desc").textContent));
   confere(ces.length > 0 && ces.every(t => /CÉSPED/i.test(t)), `busca "cesped" (sem acento) acha ${ces.length} produto(s) de césped`);
   const c3 = ces[0].split(" ")[0];
   for(let i = 0; i < 3; i++) await pg.click(`.prod[data-cod="${c3}"] button[data-d="1"]`);
+  await pg.click(`.prod[data-cod="${c3}"] .conf`);
   await pg.fill("#q", c2); await pg.waitForTimeout(300);
   await pg.fill(`.prod[data-cod="${c2}"] input`, "2,5");
+  await pg.press(`.prod[data-cod="${c2}"] input`, "Enter");
   confere(/3 producto/.test(await pg.textContent("#resumen")), "barra mostra 3 produtos selecionados");
 
   // sem os dados obrigatórios não baixa: marca os campos

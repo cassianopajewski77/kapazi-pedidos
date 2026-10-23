@@ -43,6 +43,11 @@ input:focus,select:focus,textarea:focus{outline:2px solid #9db6da;border-color:#
 .det{font-size:12px;color:var(--muted)}
 .cant{display:flex;align-items:center;gap:4px}
 .cant input{width:78px;text-align:right;font-size:16px;padding:7px}
+.cant{flex-wrap:wrap;justify-content:flex-end}
+.cant .conf{width:auto;height:36px;padding:0 12px;font-size:14px;background:var(--coral);border-color:var(--coral);color:#fff;font-weight:600;flex-basis:100%;max-width:260px;margin-left:auto}
+.cant .conf.quitar{background:#fff;color:#a3271f;border-color:#f5c2bd}
+.noped{flex-basis:100%;text-align:right;font-size:12px;color:var(--ok);font-weight:600}
+.prod.pend{border-color:var(--coral);box-shadow:0 0 0 1px var(--coral) inset}
 .cant button,.btn{border:1px solid var(--line);background:#fff;border-radius:8px;cursor:pointer;font:inherit;color:inherit}
 .cant button{width:34px;height:36px;font-size:18px;line-height:1}
 .un{font-size:12px;color:var(--muted);min-width:52px}
@@ -90,6 +95,7 @@ header .lang select{width:auto;padding:5px 8px;font-size:13px;border-radius:6px;
   header img{height:30px}
   header .sub,header .lang span{display:none}
   main{padding-bottom:190px}
+  .toast{bottom:200px;max-width:90vw;text-align:center}
   .barra .btn{padding:8px 12px;font-size:14px}
 }
 </style>
@@ -299,7 +305,8 @@ function linhaProd(p){
   return `<div class="prod${it ? " sel" : ""}" data-cod="${esc(p.cod)}">
     <div><div class="foto" data-z="1">${f ? `<img loading="lazy" src="${esc(f)}" alt="" onerror="this.remove()">` : esc(t.sinFoto)}</div>${p.fotos.length > 1 ? `<div class="nfotos">${esc(t.fotos(p.fotos.length))}</div>` : ""}</div>
     <div><div class="cod">${marcar(p.cod, filtro)}${p.status === "novo" ? `<span class="tag novo">${esc(t.nuevo)}</span>` : p.status === "sai" ? `<span class="tag sai">${esc(t.saliendo)}</span>` : ""}</div><div class="desc">${marcar(descEm(p), filtro)}</div>${p.base ? `<div class="det">${esc(baseEm(p.base, idioma))}</div>` : ""}</div>
-    <div class="cant"><button type="button" data-d="-1" aria-label="-">−</button><input inputmode="decimal" value="${it ? fmtQ(it.qtd) : ""}" placeholder="0" aria-label="${esc(t.cant)} ${esc(p.cod)}"><button type="button" data-d="1" aria-label="+">+</button><span class="un">${esc(unidadeEm(p.unidade, idioma))}</span></div>
+    <div class="cant"><button type="button" data-d="-1" aria-label="-">−</button><input inputmode="decimal" value="${it ? fmtQ(it.qtd) : ""}" placeholder="0" aria-label="${esc(t.cant)} ${esc(p.cod)}"><button type="button" data-d="1" aria-label="+">+</button><span class="un">${esc(unidadeEm(p.unidade, idioma))}</span>
+      <button type="button" class="btn conf" data-c="1" hidden></button><span class="noped"${it ? "" : " hidden"}>✓ ${esc(t.enPedido)}</span></div>
   </div>`;
 }
 function desenhar(voltarTopo){
@@ -318,8 +325,18 @@ function resumo(){
 function definirQtd(cod, qtd){
   const linha = document.querySelector(`.prod[data-cod="${CSS.escape(cod)}"]`);
   if(qtd > 0) itens[cod] = {qtd, obs: (itens[cod] && itens[cod].obs) || ""}; else delete itens[cod];
-  if(linha) linha.classList.toggle("sel", qtd > 0);
+  if(linha){ linha.classList.toggle("sel", qtd > 0); linha.querySelector(".noped").hidden = !(qtd > 0); pendente(linha); }
   guardar(); resumo();
+}
+// a quantidade digitada só entra no pedido com "Confirmar producto" (ou Enter)
+function pendente(linha){
+  const cod = linha.dataset.cod, q = lerNum(linha.querySelector("input").value), atual = itens[cod] ? itens[cod].qtd : 0, b = linha.querySelector(".conf");
+  b.hidden = q === atual; b.textContent = q > 0 ? "✓ " + T().confirmar : T().quitarPed; b.classList.toggle("quitar", !(q > 0));
+  linha.classList.toggle("pend", !b.hidden);
+}
+function confirmar(linha){
+  const cod = linha.dataset.cod, q = lerNum(linha.querySelector("input").value);
+  definirQtd(cod, q); toast(q > 0 ? T().agregado(cod) : T().quitado(cod));
 }
 function abrirFotos(p){
   if(!p.fotos.length) return;
@@ -333,11 +350,13 @@ document.getElementById("lista").addEventListener("click", e => {
   const prod = e.target.closest(".prod"); if(!prod) return;
   const cod = prod.dataset.cod, p = porCod.get(cod);
   if(e.target.closest("[data-z]")){ abrirFotos(p); return; }
+  if(e.target.closest("button[data-c]")){ confirmar(prod); return; }
   const b = e.target.closest("button[data-d]"); if(!b) return;
   const inp = prod.querySelector("input"), q = Math.max(0, lerNum(inp.value) + Number(b.dataset.d));
-  inp.value = q ? fmtQ(q) : ""; definirQtd(cod, q);
+  inp.value = q ? fmtQ(q) : ""; pendente(prod);
 });
-document.getElementById("lista").addEventListener("input", e => { const prod = e.target.closest(".prod"); if(prod && e.target.tagName === "INPUT") definirQtd(prod.dataset.cod, lerNum(e.target.value)); });
+document.getElementById("lista").addEventListener("input", e => { const prod = e.target.closest(".prod"); if(prod && e.target.tagName === "INPUT") pendente(prod); });
+document.getElementById("lista").addEventListener("keydown", e => { const prod = e.target.closest(".prod"); if(prod && e.key === "Enter" && e.target.tagName === "INPUT"){ e.preventDefault(); confirmar(prod); } });
 let tq = 0;
 document.getElementById("q").addEventListener("input", e => { clearTimeout(tq); tq = setTimeout(() => { filtro = e.target.value.trim(); desenhar(true); }, 150); });
 document.getElementById("soloSel").addEventListener("click", () => { soloSel = !soloSel; desenhar(true); });
