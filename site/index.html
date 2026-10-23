@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Hoja de Pedido Kapazi</title>
 <link rel="icon" href="favicon.png">
-<script src="config.js?v=20261023g"></script>
-<script src="logo.js?v=20261023g"></script>
-<script src="traducao.js?v=20261023g"></script>
-<script src="idiomas.js?v=20261023g"></script>
+<script src="config.js?v=20261023h"></script>
+<script src="logo.js?v=20261023h"></script>
+<script src="traducao.js?v=20261023h"></script>
+<script src="idiomas.js?v=20261023h"></script>
 <style>
 :root{--navy:#041243;--coral:#F16A64;--line:#d9dbe2;--muted:#6b7080;--bg:#f5f6f8;--card:#fff;--ok:#1e6b38;--sel:#eef3fb;--warn:#fff8dc}
 *{box-sizing:border-box}
@@ -279,10 +279,19 @@ async function carregarImagens(){
   const j = await lerJson("imagens.json");
   return cod => { const k = chave(cod), l = j.img[k] || j.img[k.replace(/^0+/, "")]; return l ? l.map(n => j.base + n) : []; };
 }
+// fotos que a Kapazi colocou pela página fotos.html (tabela fotos_pedido + bucket público fotos-pedido)
+async function carregarFotosKapazi(){
+  const c = window.PEDIDOS_CFG;
+  const r = await fetch(c.url + "/rest/v1/fotos_pedido?select=cod,caminho&order=criado_em.desc", {headers: {apikey: c.key}});
+  if(!r.ok) throw new Error("HTTP " + r.status);
+  const m = new Map();
+  (await r.json()).forEach(f => { const k = chave(f.cod); m.set(k, [...(m.get(k) || []), c.url + "/storage/v1/object/public/fotos-pedido/" + f.caminho.split("/").map(encodeURIComponent).join("/")]); });
+  return m;
+}
 // banco do gerador (sempre atualizado); a cópia completa as fotos e serve de reserva se o banco não responder;
 // depois entram os produtos da tabela ATACADO que o gerador não tem; as fotos da planilha SKUImagens vêm primeiro
 async function carregarCatalogo(){
-  const [banco, copia, extra, imagens] = await Promise.allSettled([carregarBanco(), lerJson("catalogo.json"), lerJson("produtos_extra.json"), carregarImagens()]);
+  const [banco, copia, extra, imagens, kapazi] = await Promise.allSettled([carregarBanco(), lerJson("catalogo.json"), lerJson("produtos_extra.json"), carregarImagens(), carregarFotosKapazi()]);
   const cop = copia.status === "fulfilled" ? copia.value.produtos.map(daCopia) : [];
   const fotoCop = new Map(cop.map(p => [p.cod, p.foto])), imgs = imagens.value || (() => []);
   let l;
@@ -294,7 +303,8 @@ async function carregarCatalogo(){
   l = l.filter(p => !vistos.has(chave(p.cod)) && vistos.add(chave(p.cod)));
   const st = {"LANÇAMENTO": "novo", "SAINDO DE LINHA": "sai"};
   (extra.value || []).forEach(p => { if(vistos.has(chave(p.cod))) return; vistos.add(chave(p.cod)); l.push({...produto(p.cod, p.descricao, p.um), foto: "", status: st[p.status] || "", extra: true}); });
-  return l.map(p => { const fs = imgs(p.cod); return fs.length ? {...p, foto: fs[0], fotos: fs} : {...p, fotos: p.foto ? [p.foto] : []}; });
+  const fk = kapazi.value || new Map();
+  return l.map(p => { const fs = [...(fk.get(chave(p.cod)) || []), ...imgs(p.cod)]; return fs.length ? {...p, foto: fs[0], fotos: fs} : {...p, fotos: p.foto ? [p.foto] : []}; });
 }
 function prepararCatalogo(lista){
   CAT = lista.map(p => ({...p, k: chave(p.cod), busca: norm([p.cod, p.pt, p.es, traduzirEN(p.pt)].join(" ")).replace(/,/g, ".")}));

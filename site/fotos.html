@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Fotos dos produtos · Kapazi</title>
+<link rel="icon" href="favicon.png">
+<script src="config.js?v=20261023h"></script>
+<script src="logo.js?v=20261023h"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js"></script>
+<style>
+:root{--navy:#041243;--coral:#F16A64;--line:#d9dbe2;--muted:#6b7080;--bg:#f5f6f8;--card:#fff;--ok:#1e6b38}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);font:15px/1.4 "Segoe UI",Arial,sans-serif;color:#1d2030}
+header{background:var(--navy);color:#fff;padding:12px 16px;display:flex;align-items:center;gap:14px}
+header img{height:38px}
+header h1{font-size:18px;margin:0;font-weight:600;flex:1}
+main{max-width:1100px;margin:0 auto;padding:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:16px}
+.ayuda{font-size:13px;color:var(--muted);margin:0 0 14px}
+label{display:block;font-size:12px;color:var(--muted);margin-bottom:3px}
+input,select{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;font:inherit;background:#fff;color:inherit}
+.btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:9px 14px;font:inherit;cursor:pointer;color:var(--navy)}
+.btn.pri{background:var(--navy);border-color:var(--navy);color:#fff;font-weight:600}
+.btn:disabled{opacity:.5;cursor:default}
+header .btn{background:transparent;color:#fff;border-color:rgba(255,255,255,.4)}
+.busca{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.busca input{flex:1 1 260px}
+.busca select{width:auto}
+.prod{display:flex;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.prod .info{flex:1 1 260px;min-width:0}
+.cod{font-family:Consolas,monospace;font-weight:700}
+.det{font-size:12px;color:var(--muted)}
+.fotos{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.ft{position:relative;width:64px;height:64px;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#fafafa}
+.ft img{width:100%;height:100%;object-fit:cover}
+.ft.kz{border-color:var(--coral)}
+.ft button{position:absolute;top:2px;right:2px;border:0;border-radius:50%;width:20px;height:20px;line-height:20px;padding:0;background:rgba(0,0,0,.6);color:#fff;cursor:pointer;font-size:12px}
+.sem{width:64px;height:64px;border:1px dashed var(--line);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--muted);text-align:center}
+.vacio{padding:24px;text-align:center;color:var(--muted)}
+.erro{background:#fff4f3;border:1px solid #f0c4c0;color:#8a2b22;border-radius:10px;padding:12px 14px;font-size:14px;margin-bottom:12px}
+#login{max-width:380px;margin:40px auto}
+#login > div{margin-bottom:12px}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%) translateY(80px);background:var(--navy);color:#fff;padding:10px 16px;border-radius:10px;transition:transform .25s;z-index:9}
+.toast.on{transform:translateX(-50%)}
+</style>
+</head>
+<body>
+<header><img id="logo" alt="Kapazi"><h1>Fotos dos produtos do site de pedidos</h1><button class="btn" id="sair" type="button" hidden>Sair</button></header>
+<main>
+  <form class="card" id="login" hidden>
+    <p class="ayuda">Área interna da Kapazi. Entre com o mesmo e-mail e senha do gerador de proforma.</p>
+    <div id="loginErro" class="erro" hidden></div>
+    <div><label for="email">E-mail</label><input id="email" type="email" autocomplete="username" required></div>
+    <div><label for="senha">Senha</label><input id="senha" type="password" autocomplete="current-password" required></div>
+    <button class="btn pri" type="submit">Entrar</button>
+  </form>
+
+  <section class="card" id="painel" hidden>
+    <p class="ayuda">Escolha o produto e clique em <b>Colocar foto</b>. A foto aparece para todos os clientes no site de pedidos (pode levar alguns segundos). As fotos com borda vermelha foram colocadas aqui e podem ser apagadas no ✕; as demais vêm do site da Kapazi / SKUImagens.</p>
+    <div class="busca">
+      <input id="q" type="search" placeholder="Buscar código ou descrição…" autocomplete="off">
+      <select id="filtro"><option value="sem">Só produtos sem foto</option><option value="kz">Com foto colocada aqui</option><option value="todos">Todos os produtos</option></select>
+    </div>
+    <div class="det" id="contagem"></div>
+    <div id="lista"><div class="vacio">Carregando catálogo…</div></div>
+    <div style="text-align:center;margin-top:12px"><button class="btn" id="mas" type="button" hidden>Mostrar mais</button></div>
+  </section>
+</main>
+<input type="file" id="arquivo" accept="image/jpeg,image/png,image/webp" multiple hidden>
+<script>
+const C = window.PEDIDOS_CFG, BUCKET = "fotos-pedido";
+const sb = supabase.createClient(C.url, C.key);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+const chave = s => String(s || "").toUpperCase().replace(/[\s.\-\/_]/g, "");
+const norm = s => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase();
+const srcUrl = u => /^https:\/\/[^/]+\.digitaloceanspaces\.com\//.test(u) ? "/api/foto?url=" + encodeURIComponent(u) : u;
+const urlKz = caminho => C.url + "/storage/v1/object/public/" + BUCKET + "/" + caminho.split("/").map(encodeURIComponent).join("/");
+if(window.LOGO_KAPAZI) document.getElementById("logo").src = window.LOGO_KAPAZI; else document.getElementById("logo").remove();
+function toast(msg){ let t = document.querySelector(".toast"); if(!t){ t = document.createElement("div"); t.className = "toast"; document.body.appendChild(t); } t.textContent = msg; t.classList.add("on"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("on"), 2800); }
+
+/* ---------- login (mesmos usuários do gerador; só membros gravam) ---------- */
+async function entrar(){
+  const {data: {session}} = await sb.auth.getSession();
+  if(!session){ document.getElementById("login").hidden = false; return; }
+  const {data, error} = await sb.from("membros").select("email").limit(1);
+  if(error || !data || !data.length){
+    document.getElementById("login").hidden = false;
+    const e = document.getElementById("loginErro"); e.hidden = false; e.textContent = `O e-mail ${session.user.email} entrou, mas não tem acesso. Só membros do gerador podem colocar fotos.`;
+    await sb.auth.signOut(); return;
+  }
+  document.getElementById("login").hidden = true; document.getElementById("painel").hidden = false; document.getElementById("sair").hidden = false;
+  carregar();
+}
+document.getElementById("login").addEventListener("submit", async e => {
+  e.preventDefault();
+  const {error} = await sb.auth.signInWithPassword({email: document.getElementById("email").value.trim(), password: document.getElementById("senha").value});
+  if(error){ const el = document.getElementById("loginErro"); el.hidden = false; el.textContent = "Não foi possível entrar: " + error.message; return; }
+  entrar();
+});
+document.getElementById("sair").addEventListener("click", async () => { await sb.auth.signOut(); location.reload(); });
+
+/* ---------- catálogo (o mesmo do site de pedidos) ---------- */
+let CAT = [], KZ = new Map(), mostrar = 60;
+const lerJson = async u => { const r = await fetch(u, {cache: "no-cache"}); if(!r.ok) throw new Error(u + ": HTTP " + r.status); return r.json(); };
+async function carregar(){
+  const [banco, copia, extra, imagens] = await Promise.allSettled([
+    sb.rpc("catalogo_pedido").then(r => { if(r.error) throw r.error; return r.data; }), lerJson("catalogo.json"), lerJson("produtos_extra.json"), lerJson("imagens.json")]);
+  const vistos = new Map(), add = (cod, desc, foto) => { const k = chave(cod); if(!cod || vistos.has(k)) return; vistos.set(k, {cod, desc, k, foto: foto || ""}); };
+  const fotoCop = new Map(((copia.value || {}).produtos || []).map(p => [chave(p.cod), p.foto]));
+  (banco.value || []).forEach(p => add(p.cod, p.descricao, p.foto_url || fotoCop.get(chave(p.cod))));
+  ((copia.value || {}).produtos || []).forEach(p => add(p.cod, p.pt || p.desc, p.foto));
+  (extra.value || []).forEach(p => add(p.cod, p.descricao, ""));
+  const im = imagens.value || {img: {}, base: ""};
+  CAT = [...vistos.values()].map(p => { const l = im.img[p.k] || im.img[p.k.replace(/^0+/, "")]; const outras = l ? l.map(n => im.base + n) : (p.foto ? [p.foto] : []);
+    return {...p, outras, busca: norm(p.cod + " " + p.desc)}; });
+  await carregarKz(); desenhar();
+}
+async function carregarKz(){
+  const {data, error} = await sb.from("fotos_pedido").select("cod,caminho").order("criado_em");
+  if(error){ document.getElementById("lista").innerHTML = `<div class="erro">Não consegui ler as fotos (${esc(error.message)}). Rode o script <b>06_fotos_pedido.sql</b> no Supabase.</div>`; throw error; }
+  KZ = new Map(); data.forEach(f => { const k = chave(f.cod); KZ.set(k, [...(KZ.get(k) || []), f.caminho]); });
+}
+function filtrados(){
+  const q = norm(document.getElementById("q").value).split(/\s+/).filter(Boolean), f = document.getElementById("filtro").value;
+  return CAT.filter(p => (f === "todos" || (f === "kz" ? KZ.has(p.k) : !KZ.has(p.k) && !p.outras.length)) && q.every(w => p.busca.includes(w)));
+}
+function desenhar(){
+  const l = filtrados(), el = document.getElementById("lista");
+  document.getElementById("contagem").textContent = `${l.length} produto(s) · ${CAT.filter(p => !KZ.has(p.k) && !p.outras.length).length} sem nenhuma foto no catálogo de ${CAT.length}`;
+  el.innerHTML = l.length ? l.slice(0, mostrar).map(p => `<div class="prod" data-cod="${esc(p.cod)}">
+    <div class="fotos">${(KZ.get(p.k) || []).map(c => `<div class="ft kz"><img src="${esc(urlKz(c))}" alt="" loading="lazy"><button type="button" data-apagar="${esc(c)}" title="Apagar esta foto">✕</button></div>`).join("")}${
+      p.outras.slice(0, 3).map(u => `<div class="ft"><img src="${esc(srcUrl(u))}" alt="" loading="lazy"></div>`).join("")}${
+      !KZ.has(p.k) && !p.outras.length ? `<div class="sem">sem foto</div>` : ""}</div>
+    <div class="info"><div class="cod">${esc(p.cod)}</div><div>${esc(p.desc)}</div></div>
+    <button class="btn pri" type="button" data-colocar="${esc(p.cod)}">Colocar foto</button></div>`).join("")
+    : `<div class="vacio">Nenhum produto nesta lista.</div>`;
+  const mas = document.getElementById("mas"); mas.hidden = l.length <= mostrar; mas.textContent = `Mostrar mais (${l.length - mostrar})`;
+}
+document.getElementById("q").addEventListener("input", () => { mostrar = 60; desenhar(); });
+document.getElementById("filtro").addEventListener("change", () => { mostrar = 60; desenhar(); });
+document.getElementById("mas").addEventListener("click", () => { mostrar += 60; desenhar(); });
+
+/* ---------- colocar / apagar foto ---------- */
+// a foto é reduzida no navegador (lado maior 1600 px, JPEG) antes de subir
+function reduzir(arq){
+  return new Promise((ok, erro) => {
+    const img = new Image(), u = URL.createObjectURL(arq);
+    img.onload = () => { const s = Math.min(1, 1600 / Math.max(img.width, img.height)), cv = document.createElement("canvas");
+      cv.width = Math.round(img.width * s); cv.height = Math.round(img.height * s);
+      const g = cv.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, cv.width, cv.height); g.drawImage(img, 0, 0, cv.width, cv.height);
+      URL.revokeObjectURL(u); cv.toBlob(b => b ? ok(b) : erro(new Error("imagem inválida")), "image/jpeg", 0.85); };
+    img.onerror = () => { URL.revokeObjectURL(u); erro(new Error("o arquivo não é uma imagem")); };
+    img.src = u;
+  });
+}
+let codAlvo = null;
+document.getElementById("lista").addEventListener("click", async e => {
+  const b = e.target.closest("button"); if(!b) return;
+  if(b.dataset.colocar){ codAlvo = b.dataset.colocar; document.getElementById("arquivo").click(); return; }
+  if(b.dataset.apagar && confirm("Apagar esta foto do site de pedidos?")){
+    const c = b.dataset.apagar;
+    const r1 = await sb.storage.from(BUCKET).remove([c]); if(r1.error){ alert("Erro ao apagar: " + r1.error.message); return; }
+    const r2 = await sb.from("fotos_pedido").delete().eq("caminho", c); if(r2.error){ alert("Erro ao apagar: " + r2.error.message); return; }
+    await carregarKz(); desenhar(); toast("Foto apagada");
+  }
+});
+document.getElementById("arquivo").addEventListener("change", async e => {
+  const arqs = [...e.target.files], cod = codAlvo; e.target.value = ""; if(!arqs.length || !cod) return;
+  const btn = document.querySelector(`button[data-colocar="${CSS.escape(cod)}"]`); if(btn){ btn.disabled = true; btn.textContent = "Enviando…"; }
+  try{
+    for(const a of arqs){
+      const blob = await reduzir(a), caminho = `${cod.replace(/[^A-Za-z0-9_-]/g, "_")}/${Date.now()}.jpg`;
+      const up = await sb.storage.from(BUCKET).upload(caminho, blob, {contentType: "image/jpeg"}); if(up.error) throw up.error;
+      const ins = await sb.from("fotos_pedido").insert({cod, caminho}); if(ins.error){ await sb.storage.from(BUCKET).remove([caminho]); throw ins.error; }
+    }
+    await carregarKz(); desenhar(); toast(`${arqs.length} foto(s) colocada(s) em ${cod}`);
+  }catch(err){ alert("Não foi possível enviar a foto: " + (err && err.message || err)); if(btn){ btn.disabled = false; btn.textContent = "Colocar foto"; } }
+});
+
+entrar();
+</script>
+</body>
+</html>
