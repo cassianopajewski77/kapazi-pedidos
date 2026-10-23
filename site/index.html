@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Hoja de Pedido Kapazi</title>
 <link rel="icon" href="favicon.png">
-<script src="config.js?v=20261023f"></script>
-<script src="logo.js?v=20261023f"></script>
-<script src="traducao.js?v=20261023f"></script>
-<script src="idiomas.js?v=20261023f"></script>
+<script src="config.js?v=20261023g"></script>
+<script src="logo.js?v=20261023g"></script>
+<script src="traducao.js?v=20261023g"></script>
+<script src="idiomas.js?v=20261023g"></script>
 <style>
 :root{--navy:#041243;--coral:#F16A64;--line:#d9dbe2;--muted:#6b7080;--bg:#f5f6f8;--card:#fff;--ok:#1e6b38;--sel:#eef3fb;--warn:#fff8dc}
 *{box-sizing:border-box}
@@ -122,6 +122,7 @@ header .lang select{width:auto;padding:5px 8px;font-size:13px;border-radius:6px;
     <div class="busca">
       <input id="q" type="search" autocomplete="off">
       <button class="btn sec" id="soloSel" type="button"></button>
+      <label class="btn sec" style="margin:0;font-size:15px;color:inherit;cursor:pointer"><span data-t="subirHoja"></span><input type="file" id="hojaArquivo" accept=".xlsx,.xlsm,.xls,.ods,.csv,.txt,.tsv,.pdf" hidden></label>
     </div>
     <div class="chips" id="chips"></div>
     <div class="lista" id="lista"><div class="vacio" data-t="cargando"></div></div>
@@ -167,6 +168,19 @@ header .lang select{width:auto;padding:5px 8px;font-size:13px;border-radius:6px;
   </div>
 </dialog>
 
+<dialog id="dlgHoja">
+  <div class="dh"><span data-t="hojaTitulo"></span> <button class="btn sec" type="button" onclick="dlgHoja.close()">✕</button></div>
+  <div class="db">
+    <p class="ayuda" id="hojaResumo"></p>
+    <table><thead><tr><th data-t="cod"></th><th data-t="desc"></th><th style="text-align:right" data-t="cant"></th></tr></thead><tbody id="hojaTb"></tbody></table>
+    <div id="hojaFalta" style="margin-top:14px"></div>
+  </div>
+  <div class="df">
+    <button class="btn sec" type="button" onclick="dlgHoja.close()" data-t="cerrar"></button>
+    <button class="btn pri" id="hojaOk" type="button" data-t="hojaAgregar"></button>
+  </div>
+</dialog>
+
 <dialog id="dlgVer" style="max-width:min(1000px,96vw)">
   <div class="dh"><span data-t="visualizar"></span> <button class="btn sec" type="button" onclick="dlgVer.close()">✕</button></div>
   <iframe id="verPdf" title="PDF" style="display:block;width:100%;height:72vh;border:0;background:#525659"></iframe>
@@ -183,6 +197,8 @@ header .lang select{width:auto;padding:5px 8px;font-size:13px;border-radius:6px;
    Produtos: função catalogo_pedido() do Supabase do gerador (sem preços; reserva: catalogo.json) + os da
    tabela ATACADO que não estão no gerador (produtos_extra.json). Fotos: planilha SKUImagens (imagens.json). */
 const URL_JSPDF = "https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js";
+const URL_XLSX = "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js";
+const URL_PDFJS = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js", URL_PDFJS_WORKER = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
 const URL_AUTOTABLE = "https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js";
 const CONTATO = "cassiano.pajewski@kapazi.com.br";
 const MARCA = "KZ-PED v1";
@@ -473,6 +489,79 @@ document.getElementById("pedArquivo").addEventListener("change", async e => {
   carregarPedido(p);
   const l = pedidosSalvos().filter(x => x.numero !== p.numero); l.unshift(p); LS.set("kz_pedidos_v1", l.slice(0, 100));
   dlgPed.close();
+});
+
+/* ---------- subir la hoja de pedido del cliente (Excel, CSV, PDF) ---------- */
+// lê o arquivo como linhas de células [{t, x}], acha os códigos Kapazi (comparando sem espaços/pontos/traços)
+// e a quantidade: pela coluna cujo título parece "cantidad/qty/quantidade"; sem título, o 1º número depois do código
+const chaveHoja = s => String(s == null ? "" : s).toUpperCase().replace(/[^A-Z0-9]/g, "");
+async function linhasDoArquivo(f){
+  const nome = f.name.toLowerCase(), buf = await f.arrayBuffer();
+  if(/\.pdf$/.test(nome) || f.type === "application/pdf"){
+    await carregarScript(URL_PDFJS); pdfjsLib.GlobalWorkerOptions.workerSrc = URL_PDFJS_WORKER;
+    const pdf = await pdfjsLib.getDocument({data: new Uint8Array(buf)}).promise, linhas = [];
+    for(let i = 1; i <= pdf.numPages; i++){
+      const pg = await pdf.getPage(i), tc = await pg.getTextContent(), grupos = [];
+      tc.items.filter(it => it.str && it.str.trim()).forEach(it => {
+        const y = it.transform[5], x = it.transform[4];
+        let g = grupos.find(g => Math.abs(g.y - y) < 3); if(!g){ g = {y, c: []}; grupos.push(g); }
+        g.c.push({t: it.str.trim(), x});
+      });
+      grupos.sort((a, b) => b.y - a.y).forEach(g => linhas.push(g.c.sort((a, b) => a.x - b.x)));
+    }
+    return linhas;
+  }
+  await carregarScript(URL_XLSX);
+  const wb = XLSX.read(buf, {type: "array"}), linhas = [];
+  wb.SheetNames.forEach(n => XLSX.utils.sheet_to_json(wb.Sheets[n], {header: 1, raw: false, defval: ""})
+    .forEach(l => linhas.push(l.map((t, x) => ({t: String(t).trim(), x})).filter(c => c.t))));
+  return linhas;
+}
+function lerHoja(linhas){
+  const idx = new Map(); CAT.forEach(p => idx.set(chaveHoja(p.cod), p.cod));
+  const ehQtd = /^(CANT|QTY|QTD|QUANT)/;
+  // "12", "2,5", "2.5", "1.500", "1.500,5", "1,500.5" -> número; qualquer outra coisa -> 0
+  const num = t => { let v = String(t).replace(/\s/g, ""); if(!/^\d[\d.,]*$/.test(v)) return 0;
+    if(/\./.test(v) && /,/.test(v)) v = v.lastIndexOf(",") > v.lastIndexOf(".") ? v.replace(/\./g, "").replace(",", ".") : v.replace(/,/g, "");
+    else if(/,/.test(v)) v = v.replace(",", ".");
+    else if(/^\d{1,3}(\.\d{3})+$/.test(v)) v = v.replace(/\./g, "");
+    return lerNum(v); };
+  let xQtd = null; const achados = new Map(), semCod = [];
+  linhas.forEach(l => {
+    const cabec = l.find(c => ehQtd.test(chaveHoja(c.t)));
+    if(cabec && !l.some(c => idx.has(chaveHoja(c.t)))){ xQtd = cabec.x; return; }
+    let i = l.findIndex(c => idx.has(chaveHoja(c.t))), cod = i >= 0 ? idx.get(chaveHoja(l[i].t)) : null;
+    if(!cod) l.some((c, j) => c.t.split(/\s+/).some(w => idx.has(chaveHoja(w)) && (cod = idx.get(chaveHoja(w)), i = j, true)));   // código junto com a descrição
+    if(!cod){ if(l.length >= 2 && l.some(c => num(c.t)) && l.some(c => /[A-Za-z]{3}/.test(c.t))) semCod.push(l.map(c => c.t).join(" · ")); return; }
+    let q = 0;
+    if(xQtd !== null){ const cands = l.filter((c, j) => j !== i && num(c.t)); if(cands.length){ const c = cands.reduce((a, b) => Math.abs(a.x - xQtd) <= Math.abs(b.x - xQtd) ? a : b); if(typeof xQtd !== "number" || Math.abs(c.x - xQtd) < 60) q = num(c.t); } }
+    if(!q){ const c = l.slice(i + 1).find(c => num(c.t) && chaveHoja(c.t) !== chaveHoja(l[i].t)); q = c ? num(c.t) : 0; }
+    const a = achados.get(cod) || {cod, qtd: 0}; a.qtd += q; achados.set(cod, a);
+  });
+  return {achados: [...achados.values()], semCod};
+}
+let hojaLida = null;
+const dlgHoja = document.getElementById("dlgHoja");
+document.getElementById("hojaArquivo").addEventListener("change", async e => {
+  const f = e.target.files[0]; e.target.value = ""; if(!f) return;
+  const t = T();
+  if(/\.(png|jpe?g|gif|webp|heic|bmp|tiff?)$/i.test(f.name)){ alert(t.hojaImagen); return; }
+  toast(t.hojaLeyendo);
+  try{ hojaLida = lerHoja(await linhasDoArquivo(f)); }catch(err){ alert(t.hojaError + (err && err.message || err)); return; }
+  const {achados, semCod} = hojaLida;
+  document.getElementById("hojaResumo").textContent = t.hojaResumo(f.name, achados.length, achados.filter(a => !a.qtd).length);
+  document.getElementById("hojaTb").innerHTML = achados.length ? achados.map(a => { const p = porCod.get(a.cod);
+    return `<tr><td class="cod">${esc(a.cod)}</td><td>${esc(descEm(p))}</td><td class="n">${a.qtd ? esc(fmtQ(a.qtd)) + " " + esc(unidadeEm(p.unidade, idioma)) : `<span class="det">${esc(t.hojaSinCant)}</span>`}</td></tr>`; }).join("")
+    : `<tr><td colspan="3" class="vacio">${esc(t.hojaNada)}</td></tr>`;
+  document.getElementById("hojaFalta").innerHTML = semCod.length ? `<p class="ayuda" style="margin:0 0 6px">${esc(t.hojaNoEnc(semCod.length))}</p><div class="det">${semCod.slice(0, 30).map(esc).join("<br>")}${semCod.length > 30 ? "<br>…" : ""}</div>` : "";
+  document.getElementById("hojaOk").disabled = !achados.some(a => a.qtd);
+  dlgHoja.showModal();
+});
+document.getElementById("hojaOk").addEventListener("click", () => {
+  const ok = hojaLida.achados.filter(a => a.qtd);
+  ok.forEach(a => { itens[a.cod] = {qtd: a.qtd, obs: (itens[a.cod] && itens[a.cod].obs) || ""}; });
+  guardar(); dlgHoja.close(); soloSel = true; desenhar(true);
+  toast(T().hojaAgregados(ok.length));
 });
 
 /* ---------- PDF ---------- */

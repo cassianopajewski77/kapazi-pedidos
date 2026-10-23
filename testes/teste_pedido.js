@@ -46,6 +46,8 @@ function importadorDoGerador(){
   if(process.env.BANCO) await ctx.route(/supabase\.co\/rest\/v1\/rpc\/catalogo_pedido/, r => { chamadasBanco++; r.fulfill({contentType: "application/json", body: fs.readFileSync(process.env.BANCO)}); });
   await ctx.route(/cdn\.jsdelivr\.net\/npm\/jspdf@/, r => r.fulfill({contentType: "application/javascript", body: fs.readFileSync(path.join(LIBS, "jspdf/dist/jspdf.umd.min.js"))}));
   await ctx.route(/cdn\.jsdelivr\.net\/npm\/jspdf-autotable@/, r => r.fulfill({contentType: "application/javascript", body: fs.readFileSync(path.join(LIBS, "jspdf-autotable/dist/jspdf.plugin.autotable.min.js"))}));
+  await ctx.route(/cdn\.jsdelivr\.net\/npm\/xlsx@/, r => r.fulfill({contentType: "application/javascript", body: fs.readFileSync(path.join(LIBS, "xlsx-0.18.5/package/dist/xlsx.full.min.js"))}));
+  await ctx.route(/cdn\.jsdelivr\.net\/npm\/pdfjs-dist@[^/]+\/build\/(pdf(\.worker)?\.min\.js)/, r => r.fulfill({contentType: "application/javascript", body: fs.readFileSync(path.join(LIBS, "pdfjs-dist/build", r.request().url().match(/build\/(.*)$/)[1]))}));
   const pg = await ctx.newPage();
   const erros = []; pg.on("pageerror", e => erros.push(e.message));
   pg.on("dialog", d => { if(d.type() !== "confirm") erros.push("diálogo: " + d.message()); d.accept(); });
@@ -110,6 +112,7 @@ function importadorDoGerador(){
 
   // pedidos salvos: novo pedido mantém os dados do cliente; abrir pela lista e pelo PDF devolve o pedido
   const antes = await pg.evaluate(() => JSON.stringify(itens));
+  const lidosPrimeiro = Object.entries(JSON.parse(antes)).map(([c, it]) => c + "=" + it.qtd).sort().join(";");
   await pg.evaluate(() => dlgRev.close());
   await pg.click("#btnPedidos"); await pg.click("#btnNovo");
   confere(await pg.evaluate(() => !Object.keys(itens).length && !numero) && await pg.inputValue("#d_empresa") === "Alfombras del Sur S.A.", "novo pedido limpa os produtos e mantém os dados do cliente");
@@ -169,6 +172,30 @@ function importadorDoGerador(){
   const lidos = r2.linhas.map(l => [l.codTxt, l.qtd]);
   console.log("     pedido grande:", r2.info, "|", lidos.length, "itens");
   confere(JSON.stringify(lidos) === JSON.stringify(esperado), `catálogo inteiro (${esperado.length} itens, várias páginas) importa igual`);
+
+  // "Subir mi hoja de pedido": a folha do próprio cliente (Excel, CSV, PDF) preenche o pedido pelos códigos
+  const XLSXn = require(path.join(LIBS, "xlsx-0.18.5/package"));
+  const tmp = require("os").tmpdir(), comEspaco = c3.length > 6 ? c3.slice(0, 4) + " " + c3.slice(4) : c3;
+  const ws = XLSXn.utils.aoa_to_sheet([["ORDEN DE COMPRA 4471", "", "", "", ""], ["Item", "Ref. Kapazi", "Descripción", "Cant. pedida", "Precio USD"],
+    [1, c1, "camino", "12", "3,50"], [2, comEspaco.toLowerCase(), "cesped", "1.500", "8.20"], [3, "XYZ-999", "Alfombra roja especial", "4", "1"], [4, c1, "camino (repetido)", "3", "3,50"]]);
+  const wb = XLSXn.utils.book_new(); XLSXn.utils.book_append_sheet(wb, ws, "Pedido"); XLSXn.writeFile(wb, path.join(tmp, "hoja_cliente.xlsx"));
+  await pg.evaluate(() => { dlgRev.close(); Object.keys(itens).forEach(k => delete itens[k]); resumo(); });
+  await pg.setInputFiles("#hojaArquivo", path.join(tmp, "hoja_cliente.xlsx"));
+  await pg.waitForFunction(() => dlgHoja.open);
+  const hx = await pg.evaluate(() => ({a: hojaLida.achados.map(a => a.cod + "=" + a.qtd).sort().join(";"), s: hojaLida.semCod.length}));
+  console.log("     hoja xlsx:", hx.a, "| sem código:", hx.s);
+  confere(hx.a === [c1 + "=15", c3 + "=1500"].sort().join(";") && hx.s === 1, "hoja Excel: códigos achados (com espaço/minúscula), quantidade pela coluna Cant., repetidos somados, linha sem código listada");
+  await pg.click("#hojaOk");
+  confere(await pg.evaluate(([a, b]) => itens[a].qtd === 15 && itens[b].qtd === 1500 && Object.keys(itens).length === 2, [c1, c3]), "Agregar al pedido coloca os produtos com as quantidades");
+  fs.writeFileSync(path.join(tmp, "hoja_cliente.csv"), `codigo;descripcion;cantidad\n${c2};algo;7\n`);
+  await pg.setInputFiles("#hojaArquivo", path.join(tmp, "hoja_cliente.csv")); await pg.waitForFunction(() => dlgHoja.open);
+  confere(await pg.evaluate(() => hojaLida.achados.map(a => a.cod + "=" + a.qtd).join()) === c2 + "=7", "hoja CSV lida");
+  await pg.evaluate(() => dlgHoja.close());
+  await pg.setInputFiles("#hojaArquivo", arq); await pg.waitForFunction(() => dlgHoja.open, null, {timeout: 20000});
+  const hp = await pg.evaluate(() => hojaLida.achados.map(a => a.cod + "=" + a.qtd).sort().join(";"));
+  console.log("     hoja pdf:", hp);
+  confere(hp === lidosPrimeiro, "hoja PDF (com texto) lida com códigos e quantidades");
+  await pg.evaluate(() => dlgHoja.close());
 
   // português e inglês: tela traduzida e PDF que o gerador também lê
   for(const [l, titulo] of [["pt", "Folha de Pedido Kapazi"], ["en", "Kapazi Order Sheet"]]){
