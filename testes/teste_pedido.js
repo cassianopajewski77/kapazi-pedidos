@@ -57,6 +57,12 @@ function importadorDoGerador(){
   confere(await pg.$$eval(".prod", l => l.length) === 40, "lista mostra os primeiros 40 produtos");
   confere(await pg.inputValue("#d_codCliente") === "007700", "?cliente= preenche o código de cliente");
 
+  // fotos da planilha SKUImagens: a 1ª vira a foto do produto e a galeria mostra todas
+  const gal = await pg.evaluate(() => { const p = CAT.find(p => p.fotos.length > 2); if(!p) return null; abrirFotos(p); return {n: p.fotos.length, mini: document.querySelectorAll("#zoomM img").length, src: document.getElementById("zoomI").getAttribute("src")}; });
+  confere(gal && gal.mini === gal.n && /^\/api\/foto\?url=/.test(gal.src), `galeria com todas as fotos do produto (${gal && gal.n})`);
+  await pg.evaluate(() => zoom.close());
+  console.log("     produtos com foto:", await pg.evaluate(() => CAT.filter(p => p.foto).length), "de", catalogo.length);
+
   // busca por código e por descrição em espanhol
   const c1 = catalogo.find(p => p.unidade === "PIEZA").cod, c2 = catalogo.find(p => p.unidade === "ROLLO" && /,/.test(p.desc)).cod;
   await pg.fill("#q", c1); await pg.waitForTimeout(300);

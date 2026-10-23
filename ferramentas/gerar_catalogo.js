@@ -15,13 +15,17 @@ if(pastaFotos){
   for(const js of ["fotos.js", "fotos_catalogo.js"]){ const p = path.join(pastaFotos, js); if(fs.existsSync(p)) new Function("window", fs.readFileSync(p, "utf8"))(window); }
   F = window.FOTOS_PADRAO || {}; C = window.FOTOS_CATALOGO || C;
 }
+// fotos da planilha SKUImagens (site/imagens.json, ferramentas/gerar_imagens.py) têm prioridade
+const IMG = fs.existsSync(path.join(SITE, "imagens.json")) ? JSON.parse(fs.readFileSync(path.join(SITE, "imagens.json"), "utf8")) : {base: "", img: {}};
+const chave = s => String(s || "").toUpperCase().replace(/[\s.\-\/_]/g, "");
+const fotoSku = cod => { const l = IMG.img[chave(cod)] || IMG.img[chave(cod).replace(/^0+/, "")]; return l ? IMG.base + l[0] : ""; };
 const dirFotos = path.join(SITE, "fotos");
 fs.rmSync(dirFotos, {recursive: true, force: true}); fs.mkdirSync(dirFotos, {recursive: true});
 const vistos = new Set(), out = []; let locais = 0;
 for(const p of lista){
   if(!p || !p.cod || vistos.has(p.cod)) continue; vistos.add(p.cod);
   const s = T.sugerirUnidade({um: p.um, desc: p.descricao || ""});
-  let foto = /^https:\/\/[^/]+\.digitaloceanspaces\.com\//.test(p.foto_url || "") ? p.foto_url : "";
+  let foto = fotoSku(p.cod) || (/^https:\/\/[^/]+\.digitaloceanspaces\.com\//.test(p.foto_url || "") ? p.foto_url : "");
   if(!foto){
     const d = F[p.cod] || (C.map && C.map[p.cod] != null ? C.img[C.map[p.cod]] : "");
     const m = /^data:image\/(png|jpe?g);base64,(.+)$/.exec(d || "");

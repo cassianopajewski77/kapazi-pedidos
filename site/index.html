@@ -64,7 +64,12 @@ dialog::backdrop{background:rgba(4,18,67,.45)}
 .dh{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line);font-weight:600;color:var(--navy)}
 .db{padding:16px 18px;max-height:70vh;overflow:auto}
 .df{padding:12px 18px;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
-#zoom img{display:block;max-width:100%;max-height:80vh;margin:0 auto}
+#zoom .db{text-align:center}
+#zoomI{display:block;max-width:100%;max-height:68vh;margin:0 auto}
+.miniaturas{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:10px}
+.miniaturas img{width:64px;height:52px;object-fit:contain;border:2px solid var(--line);border-radius:6px;cursor:pointer;background:#f0f1f4}
+.miniaturas img.on{border-color:var(--navy)}
+.nfotos{font-size:11px;color:var(--muted);margin-top:2px}
 #aviso{display:none;background:#fdecea;color:#a3271f;border:1px solid #f5c2bd;border-radius:10px;padding:12px 14px;margin-bottom:16px}
 .ok{background:#e8f5ec;border:1px solid #b9dfc6;color:var(--ok);border-radius:10px;padding:12px 14px;font-size:14px}
 @media (max-width:600px){
@@ -121,7 +126,7 @@ dialog::backdrop{background:rgba(4,18,67,.45)}
   </div>
 </dialog>
 
-<dialog id="zoom"><div class="dh"><span id="zoomT"></span><button class="btn sec" type="button" onclick="zoom.close()">✕</button></div><div class="db"><img id="zoomI" alt=""></div></dialog>
+<dialog id="zoom"><div class="dh"><span id="zoomT"></span><button class="btn sec" type="button" onclick="zoom.close()">✕</button></div><div class="db"><img id="zoomI" alt=""><div class="miniaturas" id="zoomM"></div></div></dialog>
 
 <script>
 "use strict";
@@ -183,13 +188,22 @@ async function carregarBanco(){
     return {cod: p.cod, desc, pt: p.descricao && p.descricao !== desc ? p.descricao : "", unidade: s.unidade, base: s.baseFator || "", foto: p.foto_url || ""};
   });
 }
-// banco do gerador (sempre atualizado); a cópia completa as fotos e serve de reserva se o banco não responder
+// todas as fotos de cada código (planilha SKUImagens do site Kapazi, ferramentas/gerar_imagens.py)
+async function carregarImagens(){
+  const r = await fetch("imagens.json", {cache: "no-cache"});
+  if(!r.ok) throw new Error("HTTP " + r.status);
+  const j = await r.json(); return cod => { const k = chave(cod), l = j.img[k] || j.img[k.replace(/^0+/, "")]; return l ? l.map(n => j.base + n) : []; };
+}
+// banco do gerador (sempre atualizado); a cópia completa as fotos e serve de reserva se o banco não responder;
+// as fotos da planilha SKUImagens vêm primeiro
 async function carregarCatalogo(){
-  const [banco, copia] = await Promise.allSettled([carregarBanco(), carregarCopia()]);
-  const fotos = new Map((copia.value || []).map(p => [p.cod, p.foto]));
-  if(banco.status === "fulfilled" && banco.value.length) return banco.value.map(p => p.foto ? p : {...p, foto: fotos.get(p.cod) || ""});
-  if(copia.status === "fulfilled") return copia.value;
-  throw banco.reason;
+  const [banco, copia, imagens] = await Promise.allSettled([carregarBanco(), carregarCopia(), carregarImagens()]);
+  const fotos = new Map((copia.value || []).map(p => [p.cod, p.foto])), imgs = imagens.value || (() => []);
+  let l;
+  if(banco.status === "fulfilled" && banco.value.length) l = banco.value.map(p => p.foto ? p : {...p, foto: fotos.get(p.cod) || ""});
+  else if(copia.status === "fulfilled") l = copia.value;
+  else throw banco.reason;
+  return l.map(p => { const fs = imgs(p.cod); return fs.length ? {...p, foto: fs[0], fotos: fs} : {...p, fotos: p.foto ? [p.foto] : []}; });
 }
 function prepararCatalogo(linhas){
   CAT = linhas.map(p => ({...p, k: chave(p.cod), busca: norm(p.cod + " " + p.desc + " " + (p.pt || "")).replace(/,/g, "."),
@@ -201,7 +215,8 @@ function prepararCatalogo(linhas){
   document.getElementById("chips").innerHTML = ['<button class="chip on" type="button" data-c="">Todos</button>', ...cats.map(c => `<button class="chip" type="button" data-c="${esc(c)}">${esc(c.charAt(0) + c.slice(1).toLowerCase())}</button>`)].join("");
 }
 // fotos do site Kapazi passam pelo /api/foto (o navegador não lê o digitaloceanspaces direto); as demais estão em fotos/
-const srcFoto = p => !p.foto ? "" : /^https:\/\/[^/]+\.digitaloceanspaces\.com\//.test(p.foto) ? "/api/foto?url=" + encodeURIComponent(p.foto) : p.foto;
+const srcUrl = u => !u ? "" : /^https:\/\/[^/]+\.digitaloceanspaces\.com\//.test(u) ? "/api/foto?url=" + encodeURIComponent(u) : u;
+const srcFoto = p => srcUrl(p.foto);
 
 /* ---------- lista ---------- */
 function marcar(texto, q){
@@ -221,7 +236,7 @@ function filtrados(){
 function linhaProd(p){
   const it = itens[p.cod], f = srcFoto(p);
   return `<div class="prod${it ? " sel" : ""}" data-cod="${esc(p.cod)}">
-    <div class="foto" data-z="1">${f ? `<img loading="lazy" src="${esc(f)}" alt="" onerror="this.remove()">` : "sin foto"}</div>
+    <div><div class="foto" data-z="1">${f ? `<img loading="lazy" src="${esc(f)}" alt="" onerror="this.remove()">` : "sin foto"}</div>${p.fotos.length > 1 ? `<div class="nfotos">${p.fotos.length} fotos</div>` : ""}</div>
     <div><div class="cod">${marcar(p.cod, filtro)}</div><div class="desc">${marcar(p.desc, filtro)}</div>${p.base ? `<div class="det">${esc(p.base)}</div>` : ""}</div>
     <div class="cant"><button type="button" data-d="-1" aria-label="menos">−</button><input inputmode="decimal" value="${it ? fmtQ(it.qtd) : ""}" placeholder="0" aria-label="Cantidad ${esc(p.cod)}"><button type="button" data-d="1" aria-label="más">+</button><span class="un">${esc(p.unidade)}</span></div>
   </div>`;
@@ -246,10 +261,18 @@ function definirQtd(cod, qtd){
   if(linha) linha.classList.toggle("sel", qtd > 0);
   guardar(); resumo();
 }
+function abrirFotos(p){
+  if(!p.fotos.length) return;
+  const ver = i => { document.getElementById("zoomI").src = srcUrl(p.fotos[i]); document.querySelectorAll("#zoomM img").forEach((m, k) => m.classList.toggle("on", k === i)); };
+  document.getElementById("zoomT").textContent = p.cod + " – " + p.desc;
+  document.getElementById("zoomM").innerHTML = p.fotos.length > 1 ? p.fotos.map((u, i) => `<img src="${esc(srcUrl(u))}" alt="Foto ${i + 1}" data-i="${i}" loading="lazy">`).join("") : "";
+  document.getElementById("zoomM").onclick = e => { const m = e.target.closest("img[data-i]"); if(m) ver(+m.dataset.i); };
+  ver(0); zoom.showModal();
+}
 document.getElementById("lista").addEventListener("click", e => {
   const prod = e.target.closest(".prod"); if(!prod) return;
   const cod = prod.dataset.cod, p = porCod.get(cod);
-  if(e.target.closest("[data-z]")){ const f = srcFoto(p); if(!f) return; document.getElementById("zoomI").src = f; document.getElementById("zoomT").textContent = p.cod + " – " + p.desc; zoom.showModal(); return; }
+  if(e.target.closest("[data-z]")){ abrirFotos(p); return; }
   const b = e.target.closest("button[data-d]"); if(!b) return;
   const inp = prod.querySelector("input"), q = Math.max(0, lerNum(inp.value) + Number(b.dataset.d));
   inp.value = q ? fmtQ(q) : ""; definirQtd(cod, q);

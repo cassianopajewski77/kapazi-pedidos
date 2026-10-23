@@ -13,6 +13,9 @@ Do banco do gerador ele só lê o catálogo, pela função pública `catalogo_pe
 - Catálogo: o site chama `catalogo_pedido()` no Supabase do gerador (`site/config.js`; rode
   `supabase/05_pedido_cliente.sql` uma vez no SQL Editor). Ela devolve só código, descrição, unidade e foto dos
   produtos ativos; preços, clientes e documentos continuam fechados. Produto novo no gerador aparece sozinho.
+- `site/imagens.json`: todas as fotos de cada código, da planilha **SKUImagens** do site Kapazi (aba Produtos:
+  id_variante, cod_erp, imagem_1…imagem_N). A 1ª foto aparece na lista e o cliente vê todas ao tocar na foto.
+  Atualizar: `python3 ferramentas/gerar_imagens.py "<SKUImagens.xlsx>"`, depois commit e push.
 - `site/catalogo.json` + `site/fotos/`: cópia de reserva (usada se o banco não responder) e fotos extras.
   As fotos do site Kapazi passam pelo `worker/index.js` (`/api/foto`).
 
